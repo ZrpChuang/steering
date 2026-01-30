@@ -1,0 +1,449 @@
+Rank 1 [ID: 149]
+  n_hallu=2 n_object=11 len=99
+  ΔNLL_global  (obj): 0.1623   (hallu): 0.7931
+  ΔNLL_soft    (obj): 0.0628   (hallu): 0.2072
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 1.2621   OracleSupported: False
+  Image: AMBER_149.jpg
+  Response(head): The image features a large group of colorful hot air balloons flying high in the sky. There are at least 13 balloons vis...
+
+Rank 2 [ID: 179]
+  n_hallu=2 n_object=5 len=93
+  ΔNLL_global  (obj): 0.1439   (hallu): 0.5205
+  ΔNLL_soft    (obj): -0.0165   (hallu): 0.2945
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 1.1194   OracleSupported: False
+  Image: AMBER_179.jpg
+  Response(head): The image features a brown dog lying on a bed, resting its head on a brown teddy bear. The dog appears to be enjoying th...
+
+Rank 3 [ID: 75]
+  n_hallu=3 n_object=13 len=130
+  ΔNLL_global  (obj): 0.0486   (hallu): 0.5761
+  ΔNLL_soft    (obj): 0.0135   (hallu): 0.2304
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.8901   OracleSupported: False
+  Image: AMBER_75.jpg
+  Response(head): The image features two dogs standing on a sidewalk next to a red fire hydrant. The dogs are positioned close to each oth...
+
+Rank 4 [ID: 19]
+  n_hallu=3 n_object=5 len=138
+  ΔNLL_global  (obj): 0.0191   (hallu): 0.5401
+  ΔNLL_soft    (obj): -0.0527   (hallu): 0.2333
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.8643   OracleSupported: False
+  Image: AMBER_19.jpg
+  Response(head): The image captures a serene scene of two people skiing down a snow-covered slope, enjoying the beautiful winter landscap...
+
+Rank 5 [ID: 857]
+  n_hallu=2 n_object=11 len=99
+  ΔNLL_global  (obj): 0.0046   (hallu): 0.6426
+  ΔNLL_soft    (obj): 0.0058   (hallu): 0.1600
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.8058   OracleSupported: False
+  Image: AMBER_857.jpg
+  Response(head): The image features a man sitting in a chair, working on a laptop computer. He is wearing a suit and tie, giving the impr...
+
+Rank 6 [ID: 432]
+  n_hallu=2 n_object=6 len=125
+  ΔNLL_global  (obj): 0.3548   (hallu): 0.2742
+  ΔNLL_soft    (obj): 0.1940   (hallu): -0.0030
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.7868   OracleSupported: False
+  Image: AMBER_432.jpg
+  Response(head): The image features a colorful, vintage Volkswagen van parked in front of a building. The van is painted with a flower de...
+
+Rank 7 [ID: 677]
+  n_hallu=2 n_object=16 len=109
+  ΔNLL_global  (obj): 0.0354   (hallu): 0.4699
+  ΔNLL_soft    (obj): 0.0132   (hallu): 0.2581
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.7857   OracleSupported: False
+  Image: AMBER_677.jpg
+  Response(head): The image features a small bathroom with a white toilet and a white bathtub. The toilet is positioned on the right side ...
+
+Rank 8 [ID: 873]
+  n_hallu=2 n_object=11 len=107
+  ΔNLL_global  (obj): 0.0606   (hallu): 0.3327
+  ΔNLL_soft    (obj): -0.0267   (hallu): 0.2766
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.7571   OracleSupported: False
+  Image: AMBER_873.jpg
+  Response(head): The image features a beautiful beach scene with a large body of water and a sandy shore. The beach is lined with trees, ...
+
+Rank 9 [ID: 367]
+  n_hallu=2 n_object=10 len=106
+  ΔNLL_global  (obj): 0.1042   (hallu): 0.3170
+  ΔNLL_soft    (obj): 0.0193   (hallu): 0.2074
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.7135   OracleSupported: False
+  Image: AMBER_367.jpg
+  Response(head): The image features a black and white train traveling down the tracks in a wooded area. The train is positioned in the mi...
+
+Rank 10 [ID: 859]
+  n_hallu=2 n_object=27 len=94
+  ΔNLL_global  (obj): 0.0140   (hallu): 0.3878
+  ΔNLL_soft    (obj): -0.0121   (hallu): 0.2384
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6661   OracleSupported: False
+  Image: AMBER_859.jpg
+  Response(head): The image features a refrigerator with two bottles of Coca-Cola placed on its door shelves. The bottles are positioned s...
+
+Rank 11 [ID: 979]
+  n_hallu=2 n_object=27 len=94
+  ΔNLL_global  (obj): 0.0140   (hallu): 0.3878
+  ΔNLL_soft    (obj): -0.0121   (hallu): 0.2384
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6661   OracleSupported: False
+  Image: AMBER_979.jpg
+  Response(head): The image features a refrigerator with two bottles of Coca-Cola placed on its door shelves. The bottles are positioned s...
+
+Rank 12 [ID: 853]
+  n_hallu=3 n_object=4 len=120
+  ΔNLL_global  (obj): 0.0741   (hallu): 0.3995
+  ΔNLL_soft    (obj): 0.0453   (hallu): 0.1458
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6481   OracleSupported: False
+  Image: AMBER_853.jpg
+  Response(head): The image features a bright orange sports car parked on a driveway in front of a house. The car is positioned near the c...
+
+Rank 13 [ID: 73]
+  n_hallu=3 n_object=6 len=101
+  ΔNLL_global  (obj): 0.1314   (hallu): 0.2416
+  ΔNLL_soft    (obj): -0.0036   (hallu): 0.1395
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6474   OracleSupported: False
+  Image: AMBER_73.jpg
+  Response(head): The image features a man walking down a street, passing by a stop sign. He is wearing a striped shirt and appears to be ...
+
+Rank 14 [ID: 747]
+  n_hallu=3 n_object=18 len=110
+  ΔNLL_global  (obj): 0.0321   (hallu): 0.3854
+  ΔNLL_soft    (obj): 0.0147   (hallu): 0.1869
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6218   OracleSupported: False
+  Image: AMBER_747.jpg
+  Response(head): The image features a wooden bench situated on a beach, with a colorful umbrella placed on top of it. The umbrella is ope...
+
+Rank 15 [ID: 839]
+  n_hallu=2 n_object=10 len=69
+  ΔNLL_global  (obj): 0.1373   (hallu): 0.2959
+  ΔNLL_soft    (obj): 0.0492   (hallu): 0.0954
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6166   OracleSupported: False
+  Image: AMBER_839.jpg
+  Response(head): The image features a scenic mountain road with a cloudy sky overhead. The road is surrounded by lush green hills and mou...
+
+Rank 16 [ID: 506]
+  n_hallu=5 n_object=14 len=117
+  ΔNLL_global  (obj): 0.2069   (hallu): 0.1888
+  ΔNLL_soft    (obj): 0.0290   (hallu): 0.0416
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6152   OracleSupported: False
+  Image: AMBER_506.jpg
+  Response(head): The image features a long train traveling down the tracks, with a mix of brown and yellow colors. The train is carrying ...
+
+Rank 17 [ID: 693]
+  n_hallu=2 n_object=7 len=91
+  ΔNLL_global  (obj): 0.1309   (hallu): 0.2465
+  ΔNLL_soft    (obj): 0.0802   (hallu): 0.1857
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6138   OracleSupported: False
+  Image: AMBER_693.jpg
+  Response(head): The image features a red coffee mug filled with a delicious-looking chocolate drink. The mug is placed on a dining table...
+
+Rank 18 [ID: 720]
+  n_hallu=2 n_object=13 len=110
+  ΔNLL_global  (obj): 0.0152   (hallu): 0.3113
+  ΔNLL_soft    (obj): -0.0070   (hallu): 0.2624
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.6111   OracleSupported: False
+  Image: AMBER_720.jpg
+  Response(head): The image features a beautiful beach scene with a large, open umbrella providing shade for a lounge chair. The umbrella ...
+
+Rank 19 [ID: 893]
+  n_hallu=2 n_object=9 len=103
+  ΔNLL_global  (obj): -0.0004   (hallu): 0.3251
+  ΔNLL_soft    (obj): -0.0748   (hallu): 0.1950
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.5941   OracleSupported: False
+  Image: AMBER_893.jpg
+  Response(head): The image features a blue train traveling down the tracks, surrounded by a lush green forest. The train is positioned in...
+
+Rank 20 [ID: 469]
+  n_hallu=4 n_object=4 len=128
+  ΔNLL_global  (obj): 0.0535   (hallu): 0.3085
+  ΔNLL_soft    (obj): 0.0380   (hallu): 0.1852
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.5628   OracleSupported: False
+  Image: AMBER_469.jpg
+  Response(head): The image features a display of various fruits, including oranges, apples, and lemons, arranged in a visually appealing ...
+
+Rank 21 [ID: 84]
+  n_hallu=2 n_object=13 len=93
+  ΔNLL_global  (obj): 0.1052   (hallu): 0.3102
+  ΔNLL_soft    (obj): 0.0414   (hallu): 0.0726
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.5519   OracleSupported: False
+  Image: AMBER_84.jpg
+  Response(head): The image features a young child, a toddler, standing in a bathtub filled with water. The child is holding a yellow cup,...
+
+Rank 22 [ID: 619]
+  n_hallu=2 n_object=7 len=70
+  ΔNLL_global  (obj): 0.0223   (hallu): 0.3202
+  ΔNLL_soft    (obj): -0.0034   (hallu): 0.1436
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.5119   OracleSupported: False
+  Image: AMBER_619.jpg
+  Response(head): The image features a brown teddy bear sitting on a couch, holding a remote control in its paws. The teddy bear is positi...
+
+Rank 23 [ID: 502]
+  n_hallu=2 n_object=14 len=129
+  ΔNLL_global  (obj): 0.0379   (hallu): 0.3131
+  ΔNLL_soft    (obj): -0.0257   (hallu): 0.0949
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.5096   OracleSupported: False
+  Image: AMBER_502.jpg
+  Response(head): The image features a small bathroom with a white sink and a toilet. The sink is located on the left side of the bathroom...
+
+Rank 24 [ID: 869]
+  n_hallu=2 n_object=10 len=99
+  ΔNLL_global  (obj): 0.1150   (hallu): 0.1732
+  ΔNLL_soft    (obj): 0.0058   (hallu): 0.1020
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4994   OracleSupported: False
+  Image: AMBER_869.jpg
+  Response(head): The image depicts a winding road surrounded by a lush forest filled with trees. The road is empty, with no cars or peopl...
+
+Rank 25 [ID: 574]
+  n_hallu=2 n_object=12 len=108
+  ΔNLL_global  (obj): 0.0110   (hallu): 0.2727
+  ΔNLL_soft    (obj): -0.0250   (hallu): 0.1726
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4922   OracleSupported: False
+  Image: AMBER_574.jpg
+  Response(head): The image features a man playing tennis on a clay court. He is in the middle of a swing, holding a tennis racket and pre...
+
+Rank 26 [ID: 338]
+  n_hallu=2 n_object=7 len=69
+  ΔNLL_global  (obj): 0.0520   (hallu): 0.1418
+  ΔNLL_soft    (obj): 0.0111   (hallu): 0.2465
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4813   OracleSupported: False
+  Image: AMBER_338.jpg
+  Response(head): The image features a small, white toilet with a blue lid and a blue dispenser attached to the wall above it. The toilet ...
+
+Rank 27 [ID: 128]
+  n_hallu=2 n_object=11 len=98
+  ΔNLL_global  (obj): 0.0742   (hallu): 0.2038
+  ΔNLL_soft    (obj): -0.0001   (hallu): 0.1184
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4707   OracleSupported: False
+  Image: AMBER_128.jpg
+  Response(head): The image features a small boat floating on the water, with a group of people on board. There are at least four people v...
+
+Rank 28 [ID: 22]
+  n_hallu=2 n_object=4 len=69
+  ΔNLL_global  (obj): -0.2499   (hallu): 0.7417
+  ΔNLL_soft    (obj): -0.1658   (hallu): 0.0592
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4668   OracleSupported: False
+  Image: AMBER_22.jpg
+  Response(head): The image features a beautiful young woman in a black bikini, running and playing in the ocean. She is enjoying herself ...
+
+Rank 29 [ID: 422]
+  n_hallu=4 n_object=20 len=120
+  ΔNLL_global  (obj): 0.0253   (hallu): 0.2691
+  ΔNLL_soft    (obj): -0.0026   (hallu): 0.1285
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4508   OracleSupported: False
+  Image: AMBER_422.jpg
+  Response(head): The image features a beautiful beach scene with two blue and white striped beach chairs positioned under a large green a...
+
+Rank 30 [ID: 216]
+  n_hallu=4 n_object=15 len=106
+  ΔNLL_global  (obj): 0.0111   (hallu): 0.2832
+  ΔNLL_soft    (obj): -0.0041   (hallu): 0.1374
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4470   OracleSupported: False
+  Image: AMBER_216.jpg
+  Response(head): The image features a black laptop computer sitting on a wooden desk. The laptop is open and displaying a presentation, p...
+
+Rank 31 [ID: 485]
+  n_hallu=3 n_object=7 len=113
+  ΔNLL_global  (obj): 0.0817   (hallu): 0.1978
+  ΔNLL_soft    (obj): 0.0058   (hallu): 0.0833
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4388   OracleSupported: False
+  Image: AMBER_485.jpg
+  Response(head): The image features a small white dog sitting on a skateboard, which is placed on a carpeted floor. The dog appears to be...
+
+Rank 32 [ID: 24]
+  n_hallu=9 n_object=6 len=124
+  ΔNLL_global  (obj): 0.1502   (hallu): 0.0900
+  ΔNLL_soft    (obj): -0.0316   (hallu): 0.0092
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4311   OracleSupported: False
+  Image: AMBER_24.jpg
+  Response(head): The image features a young boy standing in a grassy field, holding a white soccer ball. He appears to be enjoying his ti...
+
+Rank 33 [ID: 730]
+  n_hallu=2 n_object=10 len=80
+  ΔNLL_global  (obj): 0.0151   (hallu): 0.2564
+  ΔNLL_soft    (obj): -0.0202   (hallu): 0.0986
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.4053   OracleSupported: False
+  Image: AMBER_730.jpg
+  Response(head): The image features a long train traveling down the tracks, with a blue and yellow engine leading the way. The train is c...
+
+Rank 34 [ID: 841]
+  n_hallu=2 n_object=9 len=113
+  ΔNLL_global  (obj): 0.0360   (hallu): 0.2455
+  ΔNLL_soft    (obj): 0.0091   (hallu): 0.0893
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3976   OracleSupported: False
+  Image: AMBER_841.jpg
+  Response(head): The image captures a beautiful sunset over a large body of water, with a mountain range visible in the background. The s...
+
+Rank 35 [ID: 876]
+  n_hallu=2 n_object=14 len=130
+  ΔNLL_global  (obj): 0.0253   (hallu): 0.1698
+  ΔNLL_soft    (obj): -0.0175   (hallu): 0.1327
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3705   OracleSupported: False
+  Image: AMBER_876.jpg
+  Response(head): The image features a table with a variety of pears and leaves. There are three pears in the scene, with one on the left ...
+
+Rank 36 [ID: 685]
+  n_hallu=8 n_object=8 len=139
+  ΔNLL_global  (obj): 0.0676   (hallu): 0.2120
+  ΔNLL_soft    (obj): 0.0618   (hallu): 0.0848
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3701   OracleSupported: False
+  Image: AMBER_685.jpg
+  Response(head): The image features a table with a variety of fruits and vegetables. There is a banana prominently placed in the center o...
+
+Rank 37 [ID: 384]
+  n_hallu=6 n_object=13 len=138
+  ΔNLL_global  (obj): 0.1867   (hallu): 0.0236
+  ΔNLL_soft    (obj): 0.0400   (hallu): 0.0113
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3683   OracleSupported: False
+  Image: AMBER_384.jpg
+  Response(head): The image features a man riding in the back of a truck, which is carrying a large amount of luggage. The truck is drivin...
+
+Rank 38 [ID: 567]
+  n_hallu=2 n_object=13 len=114
+  ΔNLL_global  (obj): 0.0584   (hallu): 0.1507
+  ΔNLL_soft    (obj): 0.0025   (hallu): 0.1003
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3651   OracleSupported: False
+  Image: AMBER_567.jpg
+  Response(head): The image features a small boat floating on a body of water, possibly a lake or a beach. The boat is positioned in the m...
+
+Rank 39 [ID: 413]
+  n_hallu=2 n_object=17 len=116
+  ΔNLL_global  (obj): 0.0393   (hallu): 0.2199
+  ΔNLL_soft    (obj): 0.0201   (hallu): 0.0845
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3630   OracleSupported: False
+  Image: AMBER_413.jpg
+  Response(head): The image features a well-organized workspace with two computer monitors placed side by side on a desk. A keyboard and a...
+
+Rank 40 [ID: 584]
+  n_hallu=2 n_object=14 len=104
+  ΔNLL_global  (obj): 0.0728   (hallu): 0.1712
+  ΔNLL_soft    (obj): 0.0129   (hallu): 0.0519
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3558   OracleSupported: False
+  Image: AMBER_584.jpg
+  Response(head): The image features a woman playing tennis on a grass court. She is in the middle of a swing, holding a tennis racket and...
+
+Rank 41 [ID: 503]
+  n_hallu=2 n_object=16 len=110
+  ΔNLL_global  (obj): 0.0425   (hallu): 0.1547
+  ΔNLL_soft    (obj): -0.0042   (hallu): 0.1036
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3474   OracleSupported: False
+  Image: AMBER_503.jpg
+  Response(head): The image features a delicious pizza with a generous amount of toppings, including ham and pineapple, sitting on a woode...
+
+Rank 42 [ID: 385]
+  n_hallu=4 n_object=10 len=124
+  ΔNLL_global  (obj): -0.0024   (hallu): 0.1551
+  ΔNLL_soft    (obj): -0.0142   (hallu): 0.1827
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3471   OracleSupported: False
+  Image: AMBER_385.jpg
+  Response(head): The image features a yellow and blue fire hydrant situated in a grassy area near a house. The fire hydrant is located on...
+
+Rank 43 [ID: 932]
+  n_hallu=8 n_object=9 len=128
+  ΔNLL_global  (obj): 0.0419   (hallu): 0.1272
+  ΔNLL_soft    (obj): -0.0806   (hallu): 0.0539
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3456   OracleSupported: False
+  Image: AMBER_932.jpg
+  Response(head): The image features a laptop computer sitting on a bed, accompanied by a cell phone and a watch. The laptop is positioned...
+
+Rank 44 [ID: 187]
+  n_hallu=3 n_object=7 len=113
+  ΔNLL_global  (obj): 0.0730   (hallu): 0.1403
+  ΔNLL_soft    (obj): -0.0385   (hallu): 0.0138
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3385   OracleSupported: False
+  Image: AMBER_187.jpg
+  Response(head): The image features a young woman with a smile on her face, holding a cell phone to her ear. She appears to be engaged in...
+
+Rank 45 [ID: 211]
+  n_hallu=3 n_object=18 len=125
+  ΔNLL_global  (obj): 0.0733   (hallu): 0.0732
+  ΔNLL_soft    (obj): -0.0101   (hallu): 0.1077
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3376   OracleSupported: False
+  Image: AMBER_211.jpg
+  Response(head): The image features a white pickup truck parked on a sandy beach near the ocean. The truck is equipped with a surfboard r...
+
+Rank 46 [ID: 972]
+  n_hallu=4 n_object=19 len=138
+  ΔNLL_global  (obj): 0.0600   (hallu): 0.1590
+  ΔNLL_soft    (obj): 0.0249   (hallu): 0.0811
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3353   OracleSupported: False
+  Image: AMBER_972.jpg
+  Response(head): The image features two paintings of a table setting with various items on it. The table is adorned with a bottle of wine...
+
+Rank 47 [ID: 559]
+  n_hallu=5 n_object=23 len=136
+  ΔNLL_global  (obj): 0.0282   (hallu): 0.1361
+  ΔNLL_soft    (obj): -0.0115   (hallu): 0.1154
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3193   OracleSupported: False
+  Image: AMBER_559.jpg
+  Response(head): The image features a bathroom with a white toilet situated next to a sink. The toilet is covered with a black and white ...
+
+Rank 48 [ID: 808]
+  n_hallu=2 n_object=17 len=127
+  ΔNLL_global  (obj): 0.0320   (hallu): 0.2281
+  ΔNLL_soft    (obj): 0.0113   (hallu): 0.0376
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3184   OracleSupported: False
+  Image: AMBER_808.jpg
+  Response(head): The image features a bathroom with a white toilet positioned next to a white sink. The toilet is located on the left sid...
+
+Rank 49 [ID: 770]
+  n_hallu=2 n_object=19 len=115
+  ΔNLL_global  (obj): 0.0682   (hallu): 0.0761
+  ΔNLL_soft    (obj): 0.0053   (hallu): 0.1098
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3171   OracleSupported: False
+  Image: AMBER_770.jpg
+  Response(head): The image features a glazed doughnut sitting on a napkin on a dining table. The doughnut is placed in the center of the ...
+
+Rank 50 [ID: 907]
+  n_hallu=12 n_object=11 len=121
+  ΔNLL_global  (obj): 0.1558   (hallu): -0.0009
+  ΔNLL_soft    (obj): -0.0019   (hallu): -0.0006
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3120   OracleSupported: False
+  Image: AMBER_907.jpg
+  Response(head): The image features a man standing on a beach, holding a Frisbee in his hand. He is surrounded by two dogs, one on his le...

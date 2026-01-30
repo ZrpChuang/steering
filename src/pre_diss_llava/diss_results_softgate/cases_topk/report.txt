@@ -1,0 +1,8 @@
+Rank 1 [ID: 498]
+  n_hallu=1 n_object=15 len=122
+  ΔNLL_global  (obj): 0.0008   (hallu): 0.2477
+  ΔNLL_soft    (obj): -0.0067   (hallu): 0.0726
+  ΔNLL_oracle  (obj): nan   (hallu): nan
+  Score: 0.3285   OracleSupported: False
+  Image: AMBER_498.jpg
+  Response(head): The image features a young man in a red shirt, standing on a grassy field and holding a frisbee in his hand. He appears ...

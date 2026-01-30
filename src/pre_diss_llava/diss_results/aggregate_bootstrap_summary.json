@@ -1,0 +1,52 @@
+{
+  "total_examples": 1000,
+  "bootstrap_iters": 1000,
+  "delta_nll_global_hallu": {
+    "mean": 7.384596824645996,
+    "ci_low": 7.045186936855316,
+    "ci_high": 7.747789108753204,
+    "n": 341
+  },
+  "delta_nll_global_object": {
+    "mean": 3.280043601989746,
+    "ci_low": 3.1829032838344573,
+    "ci_high": 3.383472329378128,
+    "n": 998
+  },
+  "delta_nll_oracle_hallu": {
+    "mean": 0.8285738825798035,
+    "ci_low": 0.700121721625328,
+    "ci_high": 0.961796660721302,
+    "n": 341
+  },
+  "delta_nll_oracle_object": {
+    "mean": 0.0015125907957553864,
+    "ci_low": 0.00028425876225810496,
+    "ci_high": 0.0026741799258161326,
+    "n": 339
+  },
+  "delta_entropy_global_hallu": {
+    "mean": 2.259291410446167,
+    "ci_low": 2.141887444257736,
+    "ci_high": 2.3801595091819765,
+    "n": 341
+  },
+  "delta_entropy_global_object": {
+    "mean": 2.27516508102417,
+    "ci_low": 2.236433655023575,
+    "ci_high": 2.314096301794052,
+    "n": 998
+  },
+  "delta_entropy_oracle_hallu": {
+    "mean": 0.48098355531692505,
+    "ci_low": 0.3970599815249443,
+    "ci_high": 0.5700849831104279,
+    "n": 341
+  },
+  "delta_entropy_oracle_object": {
+    "mean": 0.0044102780520915985,
+    "ci_low": 0.0032913196890149267,
+    "ci_high": 0.005652020068373531,
+    "n": 339
+  }
+}

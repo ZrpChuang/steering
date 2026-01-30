@@ -1,0 +1,23 @@
+{
+  "run_dir": "/data/ruipeng.zhang/steering/src/pre_diss_llava/chosen_hal_for_exp/diss_runs_softgate_selected/soft_s0p3_b0p9_20260115_162737",
+  "n_total_valid": 183,
+  "target_n": 180,
+  "dropped_ids": [
+    23,
+    807,
+    653
+  ],
+  "deadzone": {
+    "eps_x": 0.01,
+    "eps_y": 0.03
+  },
+  "quadrant_rule": "quadrants computed on (x_eff,y_eff) where x_eff=0 if |x|<eps_x; y_eff=0 if |y|<eps_y",
+  "drop_policy": {
+    "priority": [
+      "drop from GLOBAL bad_hallu first (most negative x_global first)",
+      "then GLOBAL bad_both (most negative x_global first)",
+      "then overall most-negative x_global if still needed"
+    ]
+  },
+  "n_final": 180
+}

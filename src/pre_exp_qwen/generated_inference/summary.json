@@ -1,0 +1,119 @@
+{
+  "args": {
+    "inference_json": "/data/ruipeng.zhang/steering/src/pre_exp_qwen/gen_cc594898137f460bfe9f0759e9844b3ce807cfb5_20260106_164014/generated_inference.json",
+    "question_file": "/data/ruipeng.zhang/dpo_on/AMBER/data/query/query_all.json",
+    "image_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image",
+    "image_cache_folder": "/nas_data/ruipeng.zhang/AMBER_image_pre_qwen",
+    "annotation": "/data/ruipeng.zhang/dpo_on/AMBER/data/annotations.json",
+    "relation": "/data/ruipeng.zhang/dpo_on/AMBER/data/relation.json",
+    "safe_words": "/data/ruipeng.zhang/dpo_on/AMBER/data/safe_words.txt",
+    "model_path": "/data/base_model/models--Qwen--Qwen2.5-VL-7B-Instruct/snapshots/cc594898137f460bfe9f0759e9844b3ce807cfb5",
+    "device": "cuda",
+    "dtype": "bf16",
+    "seed": 42,
+    "gen_max_new_tokens": 256,
+    "gen_temperature": 0.0,
+    "gen_num_beams": 1,
+    "max_answer_tokens": 200,
+    "max_samples": 1000,
+    "similarity_score": 0.8,
+    "only_id": -1,
+    "start_idx": 0,
+    "n_samples": 1000,
+    "spacy_model": "/data/ruipeng.zhang/anaconda3/envs/mdpo/lib/python3.12/site-packages/en_core_web_lg/en_core_web_lg-3.8.0",
+    "output_root": "/data/ruipeng.zhang/steering/src/pre_exp_qwen",
+    "run_tag": "",
+    "no_save_token_csv": false,
+    "objclean_window": 2,
+    "no_objclean": false
+  },
+  "notes": {
+    "noimg_definition": "text-only inputs: no image placeholder tokens; pixel_values not provided (true no-image branch)",
+    "img_definition": "prefer image-only cache (pixel_values + image_grid_thw); fallback online PIL+_build_inputs",
+    "max_answer_tokens": 200,
+    "rate_definition": "rate[k]=count[k]/denom[k], denom[k]=#(len>=k)",
+    "visual_sensitivity": "Δ_t = logp_img(x_t) - logp_noimg(x_t) on teacher-forced answer tokens",
+    "ppl": "PPL_img = exp(mean NLL over truncated tokens)",
+    "offset_policy": "offsets recovered via prefix decode diff",
+    "subset_run": "supported via --only-id / --start-idx / --n-samples (with --max-samples as cap)",
+    "token_csv_default": "delta_tokens.csv.gz is saved by default; use --no-save-token-csv to disable",
+    "objclean_default": "objclean denoise runs by default; use --no-objclean to disable"
+  },
+  "tf_cache": {
+    "image_cache_folder": "/nas_data/ruipeng.zhang/AMBER_image_pre_qwen",
+    "hit": 1000,
+    "miss": 0
+  },
+  "delta_summary": {
+    "__all__": {
+      "delta": {
+        "n": 98358,
+        "mean": 0.7626148348295392,
+        "median": 0.09031486511230469
+      },
+      "abs_delta": {
+        "n": 98358,
+        "mean": 0.8744672059591043,
+        "median": 0.2187976837158203
+      }
+    },
+    "function": {
+      "delta": {
+        "n": 37124,
+        "mean": 0.5071128996625156,
+        "median": 0.027021408081054688
+      },
+      "abs_delta": {
+        "n": 37124,
+        "mean": 0.6163127357596764,
+        "median": 0.12001419067382812
+      }
+    },
+    "hallu": {
+      "delta": {
+        "n": 405,
+        "mean": 1.566518748248065,
+        "median": 0.4379444122314453
+      },
+      "abs_delta": {
+        "n": 405,
+        "mean": 1.6725829677817263,
+        "median": 0.5258026123046875
+      }
+    },
+    "object": {
+      "delta": {
+        "n": 25762,
+        "mean": 0.8886456968584246,
+        "median": 0.14365673065185547
+      },
+      "abs_delta": {
+        "n": 25762,
+        "mean": 0.9973726598717265,
+        "median": 0.29308509826660156
+      }
+    },
+    "other": {
+      "delta": {
+        "n": 35067,
+        "mean": 0.9312310748448794,
+        "median": 0.19854736328125
+      },
+      "abs_delta": {
+        "n": 35067,
+        "mean": 1.048254509248477,
+        "median": 0.3318023681640625
+      }
+    }
+  },
+  "ppl_img_summary": {
+    "n": 1000,
+    "mean": 1.6221674714126493,
+    "median": 1.6203756082149323
+  },
+  "token_csv": {
+    "saved": true,
+    "path": "/data/ruipeng.zhang/steering/src/pre_exp_qwen/generated_inference/delta_tokens.csv.gz",
+    "token_records_n": 98358
+  }
+}

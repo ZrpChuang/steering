@@ -1,0 +1,5 @@
+rank=0001	id=149	score=1.262130	case_149_rank_0001_delta.png
+rank=0002	id=179	score=1.119386	case_179_rank_0002_delta.png
+rank=0003	id=75	score=0.890064	case_75_rank_0003_delta.png
+rank=0004	id=19	score=0.864328	case_19_rank_0004_delta.png
+rank=0005	id=857	score=0.805806	case_857_rank_0005_delta.png

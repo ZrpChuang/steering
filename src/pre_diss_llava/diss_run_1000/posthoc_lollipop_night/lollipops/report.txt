@@ -1,0 +1,10 @@
+rank=0001	id=149	score=1.262130	OK	case_149_rank_0001_delta.png
+rank=0002	id=179	score=1.119386	OK	case_179_rank_0002_delta.png
+rank=0003	id=75	score=0.890064	OK	case_75_rank_0003_delta.png
+rank=0004	id=19	score=0.864328	OK	case_19_rank_0004_delta.png
+rank=0005	id=857	score=0.805806	OK	case_857_rank_0005_delta.png
+rank=0006	id=432	score=0.786808	OK	case_432_rank_0006_delta.png
+rank=0007	id=677	score=0.785704	OK	case_677_rank_0007_delta.png
+rank=0008	id=873	score=0.757057	OK	case_873_rank_0008_delta.png
+rank=0009	id=367	score=0.713507	OK	case_367_rank_0009_delta.png
+rank=0010	id=859	score=0.666142	OK	case_859_rank_0010_delta.png

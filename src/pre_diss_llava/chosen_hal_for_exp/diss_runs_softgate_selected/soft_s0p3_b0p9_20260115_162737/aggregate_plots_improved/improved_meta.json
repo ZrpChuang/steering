@@ -1,0 +1,24 @@
+{
+  "run_dir": "/data/ruipeng.zhang/steering/src/pre_diss_llava/chosen_hal_for_exp/diss_runs_softgate_selected/soft_s0p3_b0p9_20260115_162737",
+  "n_valid": 183,
+  "n_improved": 14,
+  "ratio_improved": 0.07650273224043716,
+  "criteria": {
+    "X_SUPPRESS_TH": 0.0,
+    "MIN_OBJ_REDUCTION": 0.02,
+    "Y_SOFT_MAX": 0.0,
+    "X_DROP_MAX": 0.02,
+    "deadzone": {
+      "ENABLE_DZ_X": true,
+      "ENABLE_DZ_Y": true,
+      "DZ_X": 0.01,
+      "DZ_Y": 0.05
+    }
+  },
+  "summary_stats_improved": {
+    "mean_obj_reduction(yg-ys)": 0.07526136189699173,
+    "median_obj_reduction(yg-ys)": 0.06870865076780319,
+    "mean_hallu_change(xs-xg)": 0.009611114859580994,
+    "median_hallu_change(xs-xg)": 0.003402154892683029
+  }
+}

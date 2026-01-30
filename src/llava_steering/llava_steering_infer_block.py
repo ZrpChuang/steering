@@ -61,19 +61,19 @@ def parse_args():
     parser.add_argument(
         "--probe-path",
         type=str,
-        default="/nas_data/ruipeng.zhang/rlhfv_extract/delta_features/binary_probes_by_range.npz",
+        default="/nas_data/ruipeng.zhang/rlhfv_extract_llava_log_fix/delta_only_fixed/aa_steering_vectoer/delta_post_pos2p3_vs_near0_as_W_refined.npz",
         help="binary_probes_by_range.npz 路径",
     )
     parser.add_argument(
         "--steer-layers",
         type=str,
-        default="17,18,19,20",
-        help="需要加 steering 的层号，逗号分隔，例如 '13,14,15,16'",
+        default="1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30",
+        help="需要加 steering 的层号，逗号分隔",
     )
     parser.add_argument(
         "--lambda-scale",
         type=float,
-        default=2.0,
+        default=1,
         help="steering 强度 λ，全局缩放系数",
     )
     parser.add_argument(

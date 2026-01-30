@@ -1,0 +1,26 @@
+{
+  "run_dir": "/data/ruipeng.zhang/steering/src/pre_diss_llava/chosen_hal_for_exp/diss_runs_softgate_selected/soft_s0p3_b0p9_20260115_162737",
+  "num_cases": 183,
+  "quadrants_global": {
+    "ideal": 40,
+    "sledgehammer": 97,
+    "bad_hallu": 12,
+    "bad_both": 34,
+    "nan": 0
+  },
+  "quadrants_soft": {
+    "ideal": 63,
+    "sledgehammer": 58,
+    "bad_hallu": 31,
+    "bad_both": 31,
+    "nan": 0
+  },
+  "mean_soft_minus_global_object": -0.03627424496896133,
+  "mean_soft_minus_global_hallu": -0.0734445385055917,
+  "config_excerpt": {
+    "lambda_global": 1.0,
+    "soft_other_ratio": 0.3,
+    "soft_object_weight": 0.9,
+    "soft_hallu_weight": 0.9
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "skip_counts": {
+    "not_in_selected_ids": 817
+  },
+  "skip_examples_first20": {
+    "not_in_selected_ids": [
+      2,
+      3,
+      4,
+      5,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      15,
+      16,
+      17,
+      18,
+      20,
+      21,
+      27,
+      28,
+      29
+    ]
+  },
+  "total_inference_items": 1000,
+  "selected_ids_count": 183,
+  "processed_count": 183,
+  "run_dir": "/data/ruipeng.zhang/steering/src/pre_diss_llava/diss_runs_softgate_selected/soft_s0p3_b0p9_20260115_162737"
+}

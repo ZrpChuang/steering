@@ -1,0 +1,215 @@
+{
+  "__all__": {
+    "delta": {
+      "n": 96275,
+      "mean": 0.2143872774448195,
+      "median": -0.013319,
+      "std": 1.08546641595663
+    },
+    "abs_delta": {
+      "n": 96275,
+      "mean": 0.4537037472656453,
+      "median": 0.1479,
+      "std": 1.009133536201411
+    }
+  },
+  "by_type": {
+    "function": {
+      "delta": {
+        "n": 36677,
+        "mean": 0.012271035635411837,
+        "median": -0.032547,
+        "std": 0.4948752495869512
+      },
+      "abs_delta": {
+        "n": 36677,
+        "mean": 0.26025543964882625,
+        "median": 0.130863,
+        "std": 0.42109067244180975
+      }
+    },
+    "hallu": {
+      "delta": {
+        "n": 673,
+        "mean": 0.35576168053491825,
+        "median": -0.000813,
+        "std": 1.3586167763245096
+      },
+      "abs_delta": {
+        "n": 673,
+        "mean": 0.6497328127786033,
+        "median": 0.20665,
+        "std": 1.2449149889046298
+      }
+    },
+    "object": {
+      "delta": {
+        "n": 25527,
+        "mean": 0.40969226900928424,
+        "median": -0.001463,
+        "std": 1.4415101039418015
+      },
+      "abs_delta": {
+        "n": 25527,
+        "mean": 0.6110519537352607,
+        "median": 0.135427,
+        "std": 1.3683590876792626
+      }
+    },
+    "other": {
+      "delta": {
+        "n": 33398,
+        "mean": 0.2842214563746332,
+        "median": -0.0045425,
+        "std": 1.1928601276755024
+      },
+      "abs_delta": {
+        "n": 33398,
+        "mean": 0.5419290407210012,
+        "median": 0.183364,
+        "std": 1.1000016637731487
+      }
+    }
+  },
+  "object_splits": {
+    "object_all": {
+      "delta": {
+        "n": 25527,
+        "mean": 0.40969226900928424,
+        "median": -0.001463,
+        "std": 1.4415101039418015
+      },
+      "abs_delta": {
+        "n": 25527,
+        "mean": 0.6110519537352607,
+        "median": 0.135427,
+        "std": 1.3683590876792626
+      }
+    },
+    "object_in_hallu_ids": {
+      "delta": {
+        "n": 8248,
+        "mean": 0.39149182335111543,
+        "median": -0.001579,
+        "std": 1.4168568414171923
+      },
+      "abs_delta": {
+        "n": 8248,
+        "mean": 0.5911709528370515,
+        "median": 0.136442,
+        "std": 1.3458240110737214
+      }
+    },
+    "object_clean_ids": {
+      "delta": {
+        "n": 17279,
+        "mean": 0.4183801141269749,
+        "median": -0.001408,
+        "std": 1.4530909468261244
+      },
+      "abs_delta": {
+        "n": 17279,
+        "mean": 0.620541999189768,
+        "median": 0.13504,
+        "std": 1.378923743699946
+      }
+    },
+    "hallu_all": {
+      "delta": {
+        "n": 673,
+        "mean": 0.35576168053491825,
+        "median": -0.000813,
+        "std": 1.3586167763245096
+      },
+      "abs_delta": {
+        "n": 673,
+        "mean": 0.6497328127786033,
+        "median": 0.20665,
+        "std": 1.2449149889046298
+      }
+    },
+    "function_in_hallu_ids": {
+      "delta": {
+        "n": 12426,
+        "mean": 0.00624892129406084,
+        "median": -0.034210000000000004,
+        "std": 0.4850954085444413
+      },
+      "abs_delta": {
+        "n": 12426,
+        "mean": 0.2567804723965878,
+        "median": 0.1302935,
+        "std": 0.41160064359703924
+      }
+    },
+    "function_clean_ids": {
+      "delta": {
+        "n": 24251,
+        "mean": 0.01535671427982351,
+        "median": -0.031527,
+        "std": 0.49979400742219543
+      },
+      "abs_delta": {
+        "n": 24251,
+        "mean": 0.26203598243371407,
+        "median": 0.131083,
+        "std": 0.4258687599548934
+      }
+    },
+    "other_in_hallu_ids": {
+      "delta": {
+        "n": 11154,
+        "mean": 0.23857799345526273,
+        "median": -0.011483,
+        "std": 1.1329623883425948
+      },
+      "abs_delta": {
+        "n": 11154,
+        "mean": 0.5059817198314506,
+        "median": 0.1827945,
+        "std": 1.0413874783350245
+      }
+    },
+    "other_clean_ids": {
+      "delta": {
+        "n": 22244,
+        "mean": 0.30710885007192956,
+        "median": -0.002185,
+        "std": 1.2211730988524283
+      },
+      "abs_delta": {
+        "n": 22244,
+        "mean": 0.5599544146286639,
+        "median": 0.1839035,
+        "std": 1.1278389869202528
+      }
+    }
+  },
+  "comparisons": {
+    "diff(hallu - object_clean_ids)": {
+      "diff_mean": -0.06261843359205665,
+      "diff_median": 0.0005949999999999999
+    },
+    "diff(hallu - object_in_hallu_ids)": {
+      "diff_mean": -0.035730142816197186,
+      "diff_median": 0.0007660000000000001
+    },
+    "diff(object_in_hallu_ids - object_clean_ids)": {
+      "diff_mean": -0.02688829077585947,
+      "diff_median": -0.00017100000000000014
+    },
+    "auc_abs(hallu_vs_object_clean_ids)": 0.5329712513803054,
+    "auc_abs(hallu_vs_object_in_hallu_ids)": 0.5381385626557404
+  },
+  "meta": {
+    "workdir": "/data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851",
+    "csv_path": "/data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851/delta_tokens_Sfix.csv.gz",
+    "definition": {
+      "object_clean_ids": "type==object AND this id has NO hallu tokens (under Sfix labeling)",
+      "object_in_hallu_ids": "type==object AND this id has >=1 hallu token (under Sfix labeling)"
+    },
+    "filters": {
+      "keep_align_skip": false
+    }
+  }
+}

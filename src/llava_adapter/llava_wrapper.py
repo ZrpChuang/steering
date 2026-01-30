@@ -1,5 +1,26 @@
 # src/llava_adapter/llava_wrapper.py
 # -*- coding: utf-8 -*-
+
+# ============================================================
+# 🔧 Gated steering 门控模式开关（只影响 GatedSteeredBlock）
+# 你只需要改这里：True/False
+# ============================================================
+# False：完全保持原逻辑（use_theta_tau=True -> sigmoid((s-theta)/tau)，否则 sigmoid(s)）
+# True ：强制使用 sigmoid(s) 作为门控概率 p（忽略 theta/tau，即使 use_theta_tau=True）
+GATED_STEERING_USE_PLAIN_SIGMOID = True
+
+
+# ============================================================
+# 🔧 Gated steering 调试开关（只影响 GatedSteeredBlock）
+# 你只需要改这里：True/False
+# ============================================================
+GATED_STEERING_DEBUG = False                 # 总开关：True=打印, False=完全不打印（跟之前一样）
+GATED_STEERING_DEBUG_EVERY_N = 5            # 每隔 N 步打印一次（避免刷屏）
+GATED_STEERING_DEBUG_MAX_STEPS = 20         # 每个层最多打印多少步
+GATED_STEERING_DEBUG_LAYERS = None          # None=所有注入层都打印；例如 {7, 15, 23}
+GATED_STEERING_DEBUG_PRINT_THETA_TAU = True # 是否额外打印 theta/tau（use_theta_tau=True 且未强制 plain sigmoid 时）
+
+
 import os
 import sys
 from typing import List, Dict, Any, Optional, Callable
@@ -7,10 +28,10 @@ from typing import List, Dict, Any, Optional, Callable
 import torch
 from torch import nn
 from transformers import set_seed
-import numpy as np  # 新增：用于加载 probe npz
+import numpy as np
+
 
 # ========= 1. LLaVA 仓库路径 =========
-# 建议：在环境变量里配好 LLAVA_REPO；否则用默认路径
 DEFAULT_LLAVA_REPO = "/data/ruipeng.zhang/LLaVA"
 LLAVA_REPO = os.environ.get("LLAVA_REPO", DEFAULT_LLAVA_REPO)
 if LLAVA_REPO not in sys.path:
@@ -40,14 +61,41 @@ except ImportError as e:
     )
 
 
-# ========= 3. Steering 辅助：probe 加载 + SteeredBlock =========
+# ========= 3. utils =========
 
 def _to_str_local(x) -> str:
-    """兼容 numpy 的 bytes <-> str（本地版本，避免和其他模块冲突）。"""
+    """兼容 numpy 的 bytes <-> str。"""
     if isinstance(x, str):
         return x
-    return x.decode("utf-8")
+    if isinstance(x, (bytes, np.bytes_)):
+        return x.decode("utf-8")
+    try:
+        return str(x)
+    except Exception:
+        return ""
 
+
+def _normalize_vec(v: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
+    n = v.norm(p=2)
+    if n.item() <= eps:
+        return v
+    return v / n
+
+
+def _gated_dbg_should_print(layer_id: int, step: int) -> bool:
+    """Debug 关闭时必须极轻量，避免任何同步/额外开销。"""
+    if not GATED_STEERING_DEBUG:
+        return False
+    if GATED_STEERING_DEBUG_LAYERS is not None and layer_id not in GATED_STEERING_DEBUG_LAYERS:
+        return False
+    if step >= GATED_STEERING_DEBUG_MAX_STEPS:
+        return False
+    if GATED_STEERING_DEBUG_EVERY_N <= 1:
+        return True
+    return (step % GATED_STEERING_DEBUG_EVERY_N) == 0
+
+
+# ========= 4. probe loaders =========
 
 def load_probes_and_build_dirs_local(
     probe_path: str,
@@ -56,19 +104,15 @@ def load_probes_and_build_dirs_local(
     direction: str = "more_visual",   # "more_visual" 或 "less_visual"
 ) -> Dict[int, torch.Tensor]:
     """
-    从 binary_probes_by_range.npz 里读出每层的 w_l，构造 steering 方向向量。
-    本地版本，供 SteeredBlock 注入使用，不依赖外部脚本。
-
+    从 binary_probes_by_range.npz 里读每层的 w_l，构造 steering 方向向量。
     返回:
-        layer_id -> direction_l (torch.FloatTensor, shape=[hidden_dim])
+        layer_id -> direction_l (torch.FloatTensor, shape=[hidden_dim], CPU float32)
     """
     probe_path = os.path.expanduser(probe_path)
     data = np.load(probe_path)
 
     layer_names = [_to_str_local(x) for x in data["layer_names"]]
-    W = data["W"]    # [num_layers, hidden_dim]
-    # b = data["b"]  # 目前 steering 没用到 b，如以后做 gating 可以再取
-
+    W = data["W"]  # [num_layers, hidden_dim]
     name2idx = {name: i for i, name in enumerate(layer_names)}
 
     dirs: Dict[int, torch.Tensor] = {}
@@ -77,53 +121,111 @@ def load_probes_and_build_dirs_local(
     for lid in steer_layers:
         lname = f"layer_{lid}"
         if lname not in name2idx:
-            raise ValueError(
-                f"probe 文件里没有 {lname}，可用层名: {layer_names}"
-            )
+            raise ValueError(f"probe 文件里没有 {lname}，可用层名: {layer_names}")
         row = name2idx[lname]
         w_np = W[row]                      # [hidden_dim]
-        w = torch.from_numpy(w_np).float() # 先 float32，后面再 cast 到模型 dtype
+        w = torch.from_numpy(w_np).float() # CPU float32
 
         if normalize:
             norm = w.norm(p=2).item()
             if norm > 0:
                 w = w / norm
 
-        # more_visual: 沿着 w 正方向走；less_visual: 反方向
         w = sign * w
         dirs[lid] = w
 
     return dirs
 
 
-class SteeredBlock(nn.Module):
+def load_hallu_gate_probes_local(
+    gate_probe_path: str,
+    steer_layers: List[int],
+) -> Dict[int, Dict[str, torch.Tensor]]:
     """
-    包装一个原始的 decoder block，在 forward 里“顺手”加上 steering 向量。
+    读取 hallu_gate_probes_v1.npz，返回每层 gate 参数（CPU float32）：
+      lid -> {"w": [d], "b": [], "theta": [], "tau": []}
+    注意：npz 里 layer_names 可能是 object array，需要 allow_pickle=True。
+    """
+    gate_probe_path = os.path.expanduser(gate_probe_path)
+    data = np.load(gate_probe_path, allow_pickle=True)
 
-    好处：
-    - 不使用 forward hook，避免额外的 Python 回调开销。
-    - 不改 LLaVA 原仓库源码，只在本地把若干层替换成 SteeredBlock。
+    layer_names = [_to_str_local(x) for x in data["layer_names"]]
+    W = data["W"]          # [L, d]
+    b = data["b"]          # [L]
+    theta = data["theta"] if "theta" in data.files else np.zeros((W.shape[0],), dtype=np.float32)
+    tau = data["tau"] if "tau" in data.files else np.ones((W.shape[0],), dtype=np.float32)
+
+    name2idx = {name: i for i, name in enumerate(layer_names)}
+
+    out: Dict[int, Dict[str, torch.Tensor]] = {}
+    for lid in steer_layers:
+        lname = f"layer_{lid}"
+        if lname not in name2idx:
+            raise ValueError(f"[gate-probe] 文件里没有 {lname}，可用层名: {layer_names}")
+
+        row = name2idx[lname]
+        w = torch.from_numpy(W[row]).float()                 # [d]
+        bb = torch.tensor(float(b[row]), dtype=torch.float32)
+        th = torch.tensor(float(theta[row]), dtype=torch.float32)
+        ta = torch.tensor(float(tau[row]), dtype=torch.float32)
+        out[lid] = {"w": w, "b": bb, "theta": th, "tau": ta}
+
+    return out
+
+
+# ========= 5. blocks =========
+
+class GatedSteeredBlock(nn.Module):
+    """
+    在每层 forward 内（只改 last token）：
+      s = w^T h_last + b
+      p = sigmoid((s - theta)/tau)    # 默认（use_theta_tau=True）
+          or sigmoid(s)               # use_theta_tau=False
+          or sigmoid(s)               # 若全局 GATED_STEERING_USE_PLAIN_SIGMOID=True，则强制使用
+
+    ✅ 新注入系数（保证最基本注入）：
+      alpha = lambda*1/2 + (p)*lambda*1/2
+            = lambda * (0.5 + 0.5*p)
+      h_last <- h_last + alpha * direction_vec
     """
 
     def __init__(
         self,
         base_block: nn.Module,
-        direction_vec: torch.Tensor,
+        direction_vec: torch.Tensor,     # [d]
+        gate_w: torch.Tensor,            # [d]
+        gate_b: torch.Tensor,            # scalar
+        gate_theta: torch.Tensor,        # scalar
+        gate_tau: torch.Tensor,          # scalar
         lambda_scale: float,
         enable_steering: bool = True,
+        use_theta_tau: bool = True,
+        min_tau: float = 1e-6,
+        clone_hidden: bool = True,       # 保守起见默认 clone；想提速可关
     ):
         super().__init__()
         self.base_block = base_block
-        # direction_vec 不 persistent，避免意外写进 state_dict
+
+        # 不 persistent，避免写进 state_dict
         self.register_buffer("direction_vec", direction_vec, persistent=False)
+        self.register_buffer("gate_w", gate_w, persistent=False)
+        self.register_buffer("gate_b", gate_b, persistent=False)
+        self.register_buffer("gate_theta", gate_theta, persistent=False)
+        self.register_buffer("gate_tau", gate_tau, persistent=False)
+
         self.lambda_scale = float(lambda_scale)
-        self.enable_steering = enable_steering
+        self.enable_steering = bool(enable_steering)
+        self.use_theta_tau = bool(use_theta_tau)
+        self.min_tau = float(min_tau)
+        self.clone_hidden = bool(clone_hidden)
+
+        # debug 标识：由注入函数写入 layer_id
+        self.layer_id: int = -1
+        self._dbg_step: int = 0
 
     def forward(self, *args, **kwargs):
-        # 1. 先走原始 block 的 forward
         out = self.base_block(*args, **kwargs)
 
-        # 有些实现会返回 (hidden, ...) 的 tuple
         if isinstance(out, tuple):
             hidden = out[0]
             rest = out[1:]
@@ -133,16 +235,115 @@ class SteeredBlock(nn.Module):
             rest = None
             is_tuple = False
 
-        # 关掉 steering 或维度不对，直接原样返回
         if (not self.enable_steering) or (hidden is None) or (hidden.dim() != 3):
             return out
 
-        # 2. 在正常 forward 里加 steering（GPU 上做几行算子）
-        # hidden: [bs, seq_len, dim]
-        d = self.direction_vec.to(device=hidden.device, dtype=hidden.dtype)
+        # hidden: [bs, seq_len, d]
+        if self.clone_hidden:
+            hidden = hidden.clone()
 
-        # 这里 clone 一下，避免 in-place 改写影响到缓存状态
-        hidden = hidden.clone()
+        h_last = hidden[:, -1, :]  # [bs, d]
+
+        # buffers 在注入时已对齐 device/dtype：这里不 .to(...)，减少开销
+        dvec = self.direction_vec                  # [d]
+        w = self.gate_w                            # [d]
+        b = self.gate_b                            # []
+        s = (h_last * w).sum(dim=-1, keepdim=True) + b  # [bs,1]
+
+        # ✅ 额外算一份 sigmoid(s)，用于观测/对比（以及 plain 模式下直接复用）
+        p_sig = torch.sigmoid(s)  # [bs,1]
+
+        # ✅ 选择“权重 p”
+        if (not GATED_STEERING_USE_PLAIN_SIGMOID) and self.use_theta_tau:
+            theta = self.gate_theta
+            tau = torch.clamp(self.gate_tau, min=self.min_tau)
+            p = torch.sigmoid((s - theta) / tau)   # [bs,1]
+            mode = "theta_tau"
+        else:
+            p = p_sig                               # [bs,1]
+            mode = "plain_sigmoid"
+
+        # ✅ 新的 alpha：lambda*1/2 + p*lambda*1/2（确保最基本注入）
+        lam = float(self.lambda_scale)
+        alpha_base = 0.5 * self.lambda_scale                 # scalar (float)
+        alpha_gate = 0.5 * self.lambda_scale * p             # [bs,1]
+        alpha = alpha_base + alpha_gate                      # [bs,1]
+
+        hidden[:, -1, :] = h_last + alpha * dvec             # [bs,d]
+
+        # ---- debug（只在开关打开时执行；否则完全不同步/不print）----
+        if GATED_STEERING_DEBUG:
+            step = self._dbg_step
+            if _gated_dbg_should_print(self.layer_id, step):
+                # 只打印 batch 第 1 条样本的标量，避免刷屏/减少额外统计
+                s0 = float(s[0, 0].detach().float().item())
+                sig0 = float(p_sig[0, 0].detach().float().item())  # sigmoid(s0)
+                p0 = float(p[0, 0].detach().float().item())        # 实际门控权重
+                abase0 = float(alpha_base)                         # lambda/2
+                agate0 = float(alpha_gate[0, 0].detach().float().item())  # p*lambda/2
+                a0 = float(alpha[0, 0].detach().float().item())    # 总 alpha
+
+                if (not GATED_STEERING_USE_PLAIN_SIGMOID) and self.use_theta_tau and GATED_STEERING_DEBUG_PRINT_THETA_TAU:
+                    th0 = float(self.gate_theta.detach().float().item())
+                    tau0 = float(torch.clamp(self.gate_tau, min=self.min_tau).detach().float().item())
+                    print(
+                        f"[gated][layer={self.layer_id}][step={step}][mode={mode}] "
+                        f"s0={s0:.4f} sigmoid(s0)={sig0:.4f} p0={p0:.4f} "
+                        f"alpha_base(lam/2)={abase0:.4f} alpha_gate(p*lam/2)={agate0:.4f} alpha0={a0:.4f} lam={lam:.4f} "
+                        f"theta={th0:.4f} tau={tau0:.6f}"
+                    )
+                else:
+                    print(
+                        f"[gated][layer={self.layer_id}][step={step}][mode={mode}] "
+                        f"s0={s0:.4f} sigmoid(s0)={sig0:.4f} p0={p0:.4f} "
+                        f"alpha_base(lam/2)={abase0:.4f} alpha_gate(p*lam/2)={agate0:.4f} alpha0={a0:.4f} lam={lam:.4f}"
+                    )
+
+            self._dbg_step = step + 1
+
+        if is_tuple:
+            return (hidden, *rest)
+        else:
+            return hidden
+
+
+class SteeredBlock(nn.Module):
+    """简单版：last token 加固定方向向量。"""
+
+    def __init__(
+        self,
+        base_block: nn.Module,
+        direction_vec: torch.Tensor,
+        lambda_scale: float,
+        enable_steering: bool = True,
+        clone_hidden: bool = True,   # 保守起见默认 clone；想提速可关
+    ):
+        super().__init__()
+        self.base_block = base_block
+        self.register_buffer("direction_vec", direction_vec, persistent=False)
+        self.lambda_scale = float(lambda_scale)
+        self.enable_steering = bool(enable_steering)
+        self.clone_hidden = bool(clone_hidden)
+
+    def forward(self, *args, **kwargs):
+        out = self.base_block(*args, **kwargs)
+
+        if isinstance(out, tuple):
+            hidden = out[0]
+            rest = out[1:]
+            is_tuple = True
+        else:
+            hidden = out
+            rest = None
+            is_tuple = False
+
+        if (not self.enable_steering) or (hidden is None) or (hidden.dim() != 3):
+            return out
+
+        if self.clone_hidden:
+            hidden = hidden.clone()
+
+        d = self.direction_vec  # 注入时已对齐 device/dtype
         hidden[:, -1, :] = hidden[:, -1, :] + self.lambda_scale * d
 
         if is_tuple:
@@ -151,13 +352,30 @@ class SteeredBlock(nn.Module):
             return hidden
 
 
+def _unwrap_to_base_block(block: nn.Module) -> nn.Module:
+    """
+    避免“套娃”：反复剥离 SteeredBlock / GatedSteeredBlock，拿到最底层 base_block。
+    """
+    cur = block
+    for _ in range(8):
+        if isinstance(cur, SteeredBlock):
+            cur = cur.base_block
+            continue
+        if isinstance(cur, GatedSteeredBlock):
+            cur = cur.base_block
+            continue
+        break
+    return cur
+
+
+# ========= 6. main wrapper =========
+
 class LlavaHookedModel(nn.Module):
     """
-    轻量包装：
-    - 负责加载 LLaVA 模型 & tokenizer & image_processor
-    - 提供 register_hidden_hooks / clear_hooks / pop_hook_buffers
-    - 提供 generate()，内部使用与你 AMBER 脚本 *一致* 的构造输入 & generate 逻辑
-    - 新增：支持基于 SteeredBlock 的“内联 steering”注入（替代 hook 版 steering）
+    - 加载 LLaVA 模型 & tokenizer & image_processor
+    - 支持 forward hook（采 hidden）
+    - 支持 SteeredBlock 注入（固定 steering）
+    - 支持 GatedSteeredBlock 注入（hallu gate 动态 steering）
     """
 
     def __init__(
@@ -170,15 +388,6 @@ class LlavaHookedModel(nn.Module):
         seed: int = 42,
         llava_extra_args: Optional[Dict[str, Any]] = None,
     ):
-        """
-        :param model_path: HF hub 或本地 ckpt 路径，例如 "charlesdj/CSR_LLaVA_1.5_7b_3Iteration"
-        :param model_base: 如果是 LoRA 需要底座；CSR 类型已经 merge 完，通常为 None
-        :param conv_mode: conv_templates 的 key，一般是 "llava_v1" / "llava_v1.5" 等
-        :param device: "cuda" / "cpu"
-        :param dtype: torch.float16 / bfloat16 等
-        :param seed: 随机种子
-        :param llava_extra_args: 透传给 load_pretrained_model 的额外参数
-        """
         super().__init__()
 
         if load_pretrained_model is None:
@@ -193,20 +402,18 @@ class LlavaHookedModel(nn.Module):
 
         llava_extra_args = llava_extra_args or {}
 
-        # 与你 AMBER 脚本保持一致：先解析 model_name
         model_path = os.path.expanduser(model_path)
         model_name = get_model_name_from_path(model_path)
 
         print(f"[LlavaHookedModel] Loading LLaVA from: {model_path}")
         print(f"[LlavaHookedModel] Parsed model_name: {model_name}")
 
-        # 关键：device_map=None，避免 Vision 模块被放到奇怪设备上
         tokenizer, model, image_processor, _ = load_pretrained_model(
             model_path=model_path,
             model_base=model_base,
             model_name=model_name,
             device=device,
-            device_map=None,
+            device_map=None,  # 关键：避免 mm 模块被分配到奇怪设备
             **llava_extra_args,
         )
 
@@ -217,51 +424,40 @@ class LlavaHookedModel(nn.Module):
         self.model = model
         self.image_processor = image_processor
 
-        # hook 管理（原有功能，保留备用）
+        # hook
         self._hook_handles: List[Any] = []
         self._hook_buffers: Dict[str, List[torch.Tensor]] = {}
 
-        # steering block 管理（新功能）
-        self._steering_layers: List[int] = []  # 哪些层被替换成 SteeredBlock
-        self._steering_injected: bool = False  # 是否已经注入过 steering block
+        # fixed steering
+        self._steering_layers: List[int] = []
+        self._steering_injected: bool = False
 
-    # ========= hook 相关（原功能，保持不动） =========
+        # gated steering
+        self._gated_steering_layers: List[int] = []
+        self._gated_steering_injected: bool = False
+
+    # ========= hook =========
 
     def _make_hook(self, name: str) -> Callable:
         def hook(module, input, output):
-            """
-            output 预期是 [bs, seq_len, hidden_dim]，我们只拿最后一个 token，
-            避免内存爆炸。
-            """
             if isinstance(output, torch.Tensor):
                 last_token = output[:, -1, :].detach().to("cpu")
             else:
-                # 有些实现会返回 (hidden, ...) 的 tuple
                 last_token = output[0][:, -1, :].detach().to("cpu")
 
             if name not in self._hook_buffers:
                 self._hook_buffers[name] = []
             self._hook_buffers[name].append(last_token)
-
         return hook
 
     def register_hidden_hooks(self, layer_indices: List[int]):
-        """
-        在指定 decoder 层注册 forward hook.
-
-        这里假设 self.model.model.layers 是一个 list[TransformerBlock]，
-        对 CSR_LLaVA / LLaVA-1.5 这类 LLaMA 系列基本成立。
-        """
         self.clear_hooks()
         self._hook_buffers.clear()
 
         try:
             decoder_layers = self.model.model.layers
         except AttributeError:
-            raise RuntimeError(
-                "无法访问 self.model.model.layers，请检查 LLaVA 模型结构，"
-                "必要时打印 `self.model` 结构确认 decoder block 的路径。"
-            )
+            raise RuntimeError("无法访问 self.model.model.layers，请检查模型结构。")
 
         for idx in layer_indices:
             if idx < 0 or idx >= len(decoder_layers):
@@ -276,16 +472,11 @@ class LlavaHookedModel(nn.Module):
         self._hook_handles = []
 
     def pop_hook_buffers(self) -> Dict[str, List[torch.Tensor]]:
-        """
-        返回并清空当前 hook 缓存。
-        - key: "layer_{idx}"
-        - value: list[Tensor]，长度 = 生成的 step 数，每个 Tensor 形状 [bs, hidden_dim]
-        """
         buffers = self._hook_buffers
         self._hook_buffers = {}
         return buffers
 
-    # ========= 新增：基于 SteeredBlock 的 steering 注入 =========
+    # ========= fixed steering injection =========
 
     def inject_steering_blocks_from_probes(
         self,
@@ -294,32 +485,13 @@ class LlavaHookedModel(nn.Module):
         lambda_scale: float = 1.0,
         normalize: bool = True,
         direction: str = "more_visual",
+        clone_hidden: bool = True,
     ):
-        """
-        基于 probe 文件，把指定层替换成 SteeredBlock，实现“内联 steering”。
-
-        - 不用 forward hook，CPU 调度负担更小。
-        - 原始 LLaVA 仓库代码不改，只在本地注入 wrapper。
-
-        使用方式示例：
-            llava = LlavaHookedModel(...)
-            llava.inject_steering_blocks_from_probes(
-                probe_path=".../binary_probes_by_range.npz",
-                steer_layers=[17, 18, 19, 20],
-                lambda_scale=5.0,
-                normalize=True,
-                direction="more_visual",
-            )
-        """
         try:
             decoder_layers = self.model.model.layers
         except AttributeError:
-            raise RuntimeError(
-                "无法访问 self.model.model.layers，请检查 LLaVA 模型结构，"
-                "必要时打印 `self.model` 结构确认 decoder block 的路径。"
-            )
+            raise RuntimeError("无法访问 self.model.model.layers，请检查模型结构。")
 
-        # 1. 加载每层的 steering 方向
         dirs = load_probes_and_build_dirs_local(
             probe_path=probe_path,
             steer_layers=steer_layers,
@@ -327,89 +499,240 @@ class LlavaHookedModel(nn.Module):
             direction=direction,
         )
 
-        # 2. 设备 & dtype 对齐
         model_device = next(self.model.parameters()).device
         model_dtype = next(self.model.parameters()).dtype
 
-        # 3. 逐层替换成 SteeredBlock
         for lid in steer_layers:
             if lid < 0 or lid >= len(decoder_layers):
-                raise ValueError(
-                    f"steer_layers 中的层号 {lid} 超出范围 [0, {len(decoder_layers)-1}]"
-                )
+                raise ValueError(f"steer_layers 中的层号 {lid} 超出范围 [0, {len(decoder_layers)-1}]")
 
-            base_block = decoder_layers[lid]
+            cur = decoder_layers[lid]
+            base_block = _unwrap_to_base_block(cur)
+
             dir_vec = dirs[lid].to(device=model_device, dtype=model_dtype)
 
-            # 如果已经是 SteeredBlock，就直接更新参数
-            if isinstance(base_block, SteeredBlock):
-                base_block.direction_vec = dir_vec
-                base_block.lambda_scale = float(lambda_scale)
-                base_block.enable_steering = True
-                print(f"[steering-block] 更新已有 SteeredBlock: layer_{lid}, lambda={lambda_scale:.4f}")
+            if isinstance(cur, SteeredBlock) and _unwrap_to_base_block(cur) is base_block:
+                cur.base_block = base_block
+                cur.direction_vec = dir_vec
+                cur.lambda_scale = float(lambda_scale)
+                cur.enable_steering = True
+                cur.clone_hidden = bool(clone_hidden)
+                print(f"[steering-block] update layer_{lid}, lambda={lambda_scale:.4f}")
             else:
-                steered_block = SteeredBlock(
+                decoder_layers[lid] = SteeredBlock(
                     base_block=base_block,
                     direction_vec=dir_vec,
                     lambda_scale=lambda_scale,
                     enable_steering=True,
+                    clone_hidden=clone_hidden,
                 )
-                decoder_layers[lid] = steered_block
-                print(f"[steering-block] 替换为 SteeredBlock: layer_{lid}, lambda={lambda_scale:.4f}")
+                print(f"[steering-block] replace layer_{lid}, lambda={lambda_scale:.4f}")
 
         self._steering_layers = list(steer_layers)
         self._steering_injected = True
 
     def enable_steering(self):
-        """
-        打开所有已注入 SteeredBlock 的 steering（只影响 SteeredBlock，不影响 hook）。
-        """
         if not self._steering_injected:
             return
-
         try:
             decoder_layers = self.model.model.layers
         except AttributeError:
             return
-
         for lid in self._steering_layers:
-            if 0 <= lid < len(decoder_layers):
-                layer = decoder_layers[lid]
-                if isinstance(layer, SteeredBlock):
-                    layer.enable_steering = True
-        print(f"[steering-block] enable_steering: {self._steering_layers}")
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], SteeredBlock):
+                decoder_layers[lid].enable_steering = True
+        print(f"[steering-block] enable: {self._steering_layers}")
 
     def disable_steering(self):
-        """
-        关闭所有已注入 SteeredBlock 的 steering（结构还在，只是不加向量）。
-        """
         if not self._steering_injected:
             return
-
         try:
             decoder_layers = self.model.model.layers
         except AttributeError:
             return
-
         for lid in self._steering_layers:
-            if 0 <= lid < len(decoder_layers):
-                layer = decoder_layers[lid]
-                if isinstance(layer, SteeredBlock):
-                    layer.enable_steering = False
-        print(f"[steering-block] disable_steering: {self._steering_layers}")
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], SteeredBlock):
+                decoder_layers[lid].enable_steering = False
+        print(f"[steering-block] disable: {self._steering_layers}")
 
-    # ========= 内部工具：构造 prompt 与输入 =========
+    # ========= gated steering injection =========
 
-    def _build_inputs(
+    def inject_gated_steering_blocks_from_hallu_gate(
+        self,
+        gate_probe_path: str,
+        steer_layers: List[int],
+        lambda_scale: float = 1.0,
+        use_theta_tau: bool = True,
+        dir_from_gate: bool = True,
+        dir_sign: float = -1.0,
+        dir_normalize: bool = True,
+        direction_probe_path: Optional[str] = None,
+        direction_probe_normalize: bool = True,
+        direction_probe_mode: str = "more_visual",
+        clone_hidden: bool = True,
+    ):
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            raise RuntimeError("无法访问 self.model.model.layers，请检查模型结构。")
+
+        gate = load_hallu_gate_probes_local(gate_probe_path, steer_layers)
+
+        dirs: Dict[int, torch.Tensor] = {}
+        if direction_probe_path is not None:
+            dirs = load_probes_and_build_dirs_local(
+                probe_path=direction_probe_path,
+                steer_layers=steer_layers,
+                normalize=direction_probe_normalize,
+                direction=direction_probe_mode,
+            )
+        else:
+            if not dir_from_gate:
+                raise ValueError("dir_from_gate=False 且未提供 direction_probe_path，无法构造 direction_vec。")
+            for lid in steer_layers:
+                ww = gate[lid]["w"].clone()
+                if dir_normalize:
+                    ww = _normalize_vec(ww)
+                dirs[lid] = float(dir_sign) * ww
+
+        model_device = next(self.model.parameters()).device
+        model_dtype = next(self.model.parameters()).dtype
+
+        for lid in steer_layers:
+            if lid < 0 or lid >= len(decoder_layers):
+                raise ValueError(f"layer {lid} out of range [0,{len(decoder_layers)-1}]")
+
+            cur = decoder_layers[lid]
+            base_block = _unwrap_to_base_block(cur)
+
+            dir_vec = dirs[lid].to(device=model_device, dtype=model_dtype)
+
+            gw = gate[lid]["w"].to(device=model_device, dtype=model_dtype)
+            gb = gate[lid]["b"].to(device=model_device, dtype=model_dtype)
+            gth = gate[lid]["theta"].to(device=model_device, dtype=model_dtype)
+            gta = gate[lid]["tau"].to(device=model_device, dtype=model_dtype)
+
+            if isinstance(cur, GatedSteeredBlock) and _unwrap_to_base_block(cur) is base_block:
+                cur.base_block = base_block
+                cur.direction_vec = dir_vec
+                cur.gate_w = gw
+                cur.gate_b = gb
+                cur.gate_theta = gth
+                cur.gate_tau = gta
+                cur.lambda_scale = float(lambda_scale)
+                cur.use_theta_tau = bool(use_theta_tau)
+                cur.enable_steering = True
+                cur.clone_hidden = bool(clone_hidden)
+                cur.layer_id = int(lid)     # ✅ 给 debug 用
+                cur._dbg_step = 0           # ✅ 每次注入重置计数（更直观）
+                print(f"[gated-steering] update layer_{lid}, lambda={lambda_scale:.4f}")
+            else:
+                blk = GatedSteeredBlock(
+                    base_block=base_block,
+                    direction_vec=dir_vec,
+                    gate_w=gw,
+                    gate_b=gb,
+                    gate_theta=gth,
+                    gate_tau=gta,
+                    lambda_scale=lambda_scale,
+                    enable_steering=True,
+                    use_theta_tau=use_theta_tau,
+                    clone_hidden=clone_hidden,
+                )
+                blk.layer_id = int(lid)     # ✅ 给 debug 用
+                blk._dbg_step = 0
+                decoder_layers[lid] = blk
+                print(f"[gated-steering] replace layer_{lid}, lambda={lambda_scale:.4f}")
+
+        self._gated_steering_layers = list(steer_layers)
+        self._gated_steering_injected = True
+
+    def enable_gated_steering(self):
+        if not self._gated_steering_injected:
+            return
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return
+        for lid in self._gated_steering_layers:
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], GatedSteeredBlock):
+                decoder_layers[lid].enable_steering = True
+        print(f"[gated-steering] enable: {self._gated_steering_layers}")
+
+    def disable_gated_steering(self):
+        if not self._gated_steering_injected:
+            return
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return
+        for lid in self._gated_steering_layers:
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], GatedSteeredBlock):
+                decoder_layers[lid].enable_steering = False
+        print(f"[gated-steering] disable: {self._gated_steering_layers}")
+
+    @torch.no_grad()
+    def generate_gated(
         self,
         image,
         query_text: str,
-        with_image: bool = True,
-    ):
+        max_new_tokens: int = 64,
+        temperature: float = 0.0,
+        num_beams: int = 1,
+        use_image: bool = True,
+        gate_probe_path: str = "/nas_data/ruipeng.zhang/rlhfv_hallu_hidden_llava/hallu_gate_probes_v1.npz",
+        steer_layers: Optional[List[int]] = None,
+        lambda_scale: float = 1.0,
+        use_theta_tau: bool = True,
+        dir_sign: float = -1.0,
+        dir_normalize: bool = True,
+        direction_probe_path: Optional[str] = None,
+        direction_probe_normalize: bool = True,
+        direction_probe_mode: str = "more_visual",
+        auto_disable: bool = True,
+        clone_hidden: bool = True,
+        **gen_kwargs,
+    ) -> Dict[str, Any]:
+        if steer_layers is None:
+            steer_layers = list(range(0, 32))
+
+        self.inject_gated_steering_blocks_from_hallu_gate(
+            gate_probe_path=gate_probe_path,
+            steer_layers=steer_layers,
+            lambda_scale=lambda_scale,
+            use_theta_tau=use_theta_tau,
+            dir_from_gate=True,
+            dir_sign=dir_sign,
+            dir_normalize=dir_normalize,
+            direction_probe_path=direction_probe_path,
+            direction_probe_normalize=direction_probe_normalize,
+            direction_probe_mode=direction_probe_mode,
+            clone_hidden=clone_hidden,
+        )
+
+        self.enable_gated_steering()
+
+        out = self.generate(
+            image=image,
+            query_text=query_text,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            num_beams=num_beams,
+            use_image=use_image,
+            **gen_kwargs,
+        )
+
+        if auto_disable:
+            self.disable_gated_steering()
+
+        return out
+
+    # ========= prompt/input building =========
+
+    def _build_inputs(self, image, query_text: str, with_image: bool = True):
         device = self.device
 
         if with_image:
-            # ======= 原来的有图分支，保持不变 =======
             if getattr(self.model.config, "mm_use_im_start_end", False):
                 qs = (
                     DEFAULT_IM_START_TOKEN
@@ -426,7 +749,6 @@ class LlavaHookedModel(nn.Module):
             conv.append_message(conv.roles[1], None)
             prompt = conv.get_prompt()
 
-            # 文本 token（带 IMAGE_TOKEN）
             input_ids = tokenizer_image_token(
                 prompt,
                 self.tokenizer,
@@ -434,68 +756,41 @@ class LlavaHookedModel(nn.Module):
                 return_tensors="pt",
             ).unsqueeze(0).to(device)
 
-            # 图像处理
             if image is not None:
                 image_tensor = self.image_processor.preprocess(
                     image,
                     return_tensors="pt",
                 )["pixel_values"].to(device=device, dtype=self.model.dtype)
             else:
-                # 正常情况不应该走到这里
                 image_tensor = None
-
         else:
-            # ======= 无图分支：完全 text-only =======
             qs = query_text
             conv = conv_templates[self.conv_mode].copy()
             conv.append_message(conv.roles[0], qs)
             conv.append_message(conv.roles[1], None)
             prompt = conv.get_prompt()
 
-            # 这里不用 tokenizer_image_token，直接普通 tokenizer
-            input_ids = self.tokenizer(
-                prompt,
-                return_tensors="pt",
-            ).input_ids.to(device)
-
+            input_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(device)
             image_tensor = None
 
-        # 共同的 stop_str / stopping_criteria
         stop_str = conv.sep if conv.sep_style != SeparatorStyle.TWO else conv.sep2
         keywords = [stop_str]
-        stopping_criteria = [
-            KeywordsStoppingCriteria(
-                keywords,
-                self.tokenizer,
-                input_ids,
-            )
-        ]
-
+        stopping_criteria = [KeywordsStoppingCriteria(keywords, self.tokenizer, input_ids)]
         return input_ids, image_tensor, stop_str, stopping_criteria
 
-    # ========= 推理接口 =========
     def _safe_decode_ids(self, ids, skip_special_tokens: bool = False) -> str:
-        """
-        只保留 [0, vocab_size) 范围内的 token，再交给 tokenizer.decode，
-        避免 IMAGE_TOKEN_INDEX 之类的越界 id 把 SentencePiece 弄崩。
-        """
         if isinstance(ids, torch.Tensor):
             ids = ids.tolist()
         vocab_size = self.tokenizer.vocab_size
-
-        safe_ids = []
-        for tid in ids:
-            tid = int(tid)
-            if 0 <= tid < vocab_size:
-                safe_ids.append(tid)
-            # 否则就是 IMAGE_TOKEN_INDEX 或别的“假 id”，直接跳过
-
+        safe_ids = [int(t) for t in ids if 0 <= int(t) < vocab_size]
         return self.tokenizer.decode(safe_ids, skip_special_tokens=skip_special_tokens)
+
+    # ========= generate =========
 
     @torch.no_grad()
     def generate(
         self,
-        image,  # PIL.Image.Image 或 None
+        image,
         query_text: str,
         max_new_tokens: int = 64,
         temperature: float = 0.0,
@@ -503,27 +798,12 @@ class LlavaHookedModel(nn.Module):
         use_image: bool = True,
         **gen_kwargs,
     ) -> Dict[str, Any]:
-        """
-        与你 AMBER 脚本的调用方式保持一致的 generate 接口：
-        - 内部构造 conv prompt + image token
-        - 使用 KeywordsStoppingCriteria
-        - 支持 greedy / beam search
-        - 同时收集 hook_buffers
-
-        返回：
-        {
-            "output_text": str,
-            "hook_buffers": Dict[str, List[Tensor]],
-        }
-        """
-        # 1. 构造输入（prompt）
         input_ids, image_tensor, stop_str, stopping_criteria = self._build_inputs(
             image=image,
             with_image=use_image,
             query_text=query_text,
         )
 
-        # 2. 生成
         do_sample = temperature > 0.0
         gen_outputs = self.model.generate(
             input_ids,
@@ -536,47 +816,31 @@ class LlavaHookedModel(nn.Module):
             **gen_kwargs,
         )
 
-        # LLaVA 的 generate 有的返回带 .sequences，有的是 tensor
-        if hasattr(gen_outputs, "sequences"):
-            output_ids = gen_outputs.sequences  # [1, T_out]
+        output_ids = gen_outputs.sequences if hasattr(gen_outputs, "sequences") else gen_outputs
+
+        seq = output_ids[0]
+        prompt = input_ids[0]
+
+        if seq.shape[0] >= prompt.shape[0] and torch.equal(seq[: prompt.shape[0]], prompt):
+            gen_token_ids = seq[prompt.shape[0]:].unsqueeze(0)
         else:
-            output_ids = gen_outputs           # [1, T_out]
+            gen_token_ids = seq.unsqueeze(0)
 
-        # 3. 安全地截出“新生成部分”：
-        #    只有当 output 明显以 input 为前缀时才做切分；
-        #    否则认为 output 里只有回答，整串 decode。
-        seq = output_ids[0]      # [T_out]
-        prompt = input_ids[0]    # [T_in]
+        gen_token_ids_cpu = gen_token_ids[0].detach().to("cpu")
+        outputs = self._safe_decode_ids(gen_token_ids_cpu, skip_special_tokens=True).strip()
 
-        if (
-            seq.shape[0] >= prompt.shape[0]
-            and torch.equal(seq[: prompt.shape[0]], prompt)
-        ):
-            # 真的是 [prompt, answer] 这种格式
-            gen_token_ids = seq[prompt.shape[0]:].unsqueeze(0)  # [1, T_gen]
-        else:
-            # 像你现在的 LLaVA：output 里只有 answer 部分
-            gen_token_ids = seq.unsqueeze(0)                    # [1, T_gen]
-
-        # 4. decode 生成部分（带安全过滤，防止 piece id 越界）
-        outputs = self._safe_decode_ids(
-            gen_token_ids[0],
-            skip_special_tokens=True,
-        ).strip()
-
-        # 去掉末尾的 stop_str（例如 "###" 之类的分隔符）
         if outputs.endswith(stop_str):
             outputs = outputs[: -len(stop_str)].strip()
 
-        # 5. 把 hook 中间态取出来（和 steering block 无关）
         hook_buffers = self.pop_hook_buffers()
 
         return {
             "output_text": outputs,
             "hook_buffers": hook_buffers,
+            "output_ids": gen_token_ids_cpu,
         }
 
-    # ========= Probe 用：构造 (question + answer) 的完整输入 =========
+    # ========= probe forward (teacher forcing) =========
 
     def _build_qa_inputs_for_probe(
         self,
@@ -585,17 +849,8 @@ class LlavaHookedModel(nn.Module):
         answer_text: str,
         with_image: bool = True,
     ):
-        """
-        构造“question + answer”的完整 prompt，用于 teacher forcing 前向。
-
-        返回:
-        - input_ids_full: [1, T]，包括 question + answer 整段
-        - image_tensor:   图像张量或 None
-        - prompt_len:     question 那一段的 token 长度（答案从这里开始）
-        """
         device = self.device
 
-        # 1) 把 query 前面是否加 <image> token
         if with_image:
             if getattr(self.model.config, "mm_use_im_start_end", False):
                 qs = (
@@ -610,76 +865,47 @@ class LlavaHookedModel(nn.Module):
         else:
             qs = query_text
 
-        # 2) 构造 conv：base_conv 只放 user 这条 message
         base_conv = conv_templates[self.conv_mode].copy()
         base_conv.append_message(base_conv.roles[0], qs)
 
-        # 2.1 prompt-only：assistant = None，用来测前缀长度
         conv_prompt = base_conv.copy()
         conv_prompt.append_message(conv_prompt.roles[1], None)
         prompt_only = conv_prompt.get_prompt()
 
-        # 2.2 full: assistant = answer_text，用来真正 forward
         conv_full = base_conv.copy()
         conv_full.append_message(conv_full.roles[1], answer_text)
         prompt_full = conv_full.get_prompt()
 
-        # 3) tokenization
         if with_image:
-            # 带 <image> 的用 tokenizer_image_token
             input_ids_prompt = tokenizer_image_token(
-                prompt_only,
-                self.tokenizer,
-                IMAGE_TOKEN_INDEX,
-                return_tensors="pt",
+                prompt_only, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
             ).unsqueeze(0).to(device)
 
             input_ids_full = tokenizer_image_token(
-                prompt_full,
-                self.tokenizer,
-                IMAGE_TOKEN_INDEX,
-                return_tensors="pt",
+                prompt_full, self.tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt"
             ).unsqueeze(0).to(device)
 
+            image_tensor = None
             if image is not None:
                 image_tensor = self.image_processor.preprocess(
-                    image,
-                    return_tensors="pt",
+                    image, return_tensors="pt"
                 )["pixel_values"].to(device=device, dtype=self.model.dtype)
-            else:
-                image_tensor = None
         else:
-            # 纯文本
-            input_ids_prompt = self.tokenizer(
-                prompt_only,
-                return_tensors="pt",
-            ).input_ids.to(device)
-
-            input_ids_full = self.tokenizer(
-                prompt_full,
-                return_tensors="pt",
-            ).input_ids.to(device)
-
+            input_ids_prompt = self.tokenizer(prompt_only, return_tensors="pt").input_ids.to(device)
+            input_ids_full = self.tokenizer(prompt_full, return_tensors="pt").input_ids.to(device)
             image_tensor = None
 
-        prompt_len = input_ids_prompt.shape[1]  # question + “assistant:” 前缀的长度
-        return input_ids_full, image_tensor, int(prompt_len)
+        prompt_len = int(input_ids_prompt.shape[1])
+        return input_ids_full, image_tensor, prompt_len
 
     @torch.no_grad()
     def forward_for_probe(
         self,
-        image,        # PIL.Image 或 None
+        image,
         query_text: str,
         answer_text: str,
         use_image: bool = True,
     ) -> Dict[str, Any]:
-        """
-        专门给 step1 用的接口：对 (question, answer) 做一次 teacher-forcing 前向，
-        返回整个序列的 input_ids / logits / hidden_states / prompt_len。
-
-        这里不走 generate() 的循环，而是直接 self.model(...) 一次性 forward。
-        """
-        # 1. 构造完整输入（question + answer）
         input_ids_full, image_tensor, prompt_len = self._build_qa_inputs_for_probe(
             image=image,
             query_text=query_text,
@@ -687,7 +913,6 @@ class LlavaHookedModel(nn.Module):
             with_image=use_image,
         )
 
-        # 2. 前向：拿 logits + 所有层的 hidden_states
         outputs = self.model(
             input_ids_full,
             images=image_tensor,
@@ -695,20 +920,187 @@ class LlavaHookedModel(nn.Module):
             use_cache=False,
         )
 
-        # logits: [1, T, V]
         logits = outputs.logits[0].detach().to("cpu")  # [T, V]
+        hidden_states = outputs.hidden_states          # len = L+1 (emb + layers)
 
-        # hidden_states: tuple 长度 = L+1 (embedding + 每层输出)
-        # 我们跳过 embedding，从 layer_0 对齐到你 register_hidden_hooks 里的 layer_0
-        hidden_states = outputs.hidden_states  # len = L+1
         hidden_dict: Dict[str, torch.Tensor] = {}
-        for layer_idx, h in enumerate(hidden_states[1:]):  # 从 1 开始跳过 embedding
-            # h: [1, T, d]
+        for layer_idx, h in enumerate(hidden_states[1:]):
             hidden_dict[f"layer_{layer_idx}"] = h[0].detach().to("cpu")  # [T, d]
 
         return {
-            "input_ids": input_ids_full[0].detach().to("cpu"),  # [T]
-            "logits": logits,                                   # [T, V]
-            "hidden_states": hidden_dict,                       # Dict[layer_name -> [T, d]]
-            "prompt_len": prompt_len,                           # int
+            "input_ids": input_ids_full[0].detach().to("cpu"),
+            "logits": logits,
+            "hidden_states": hidden_dict,
+            "prompt_len": int(prompt_len),
+        }
+    # ========= (NEW) silent steering toggles (no print) =========
+
+    def _silent_set_fixed_steering(self, enabled: bool):
+        """静默开关 fixed steering（不 print，不改变其它逻辑）"""
+        if not self._steering_injected:
+            return
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return
+        for lid in self._steering_layers:
+            if 0 <= lid < len(decoder_layers):
+                blk = decoder_layers[lid]
+                if isinstance(blk, SteeredBlock):
+                    blk.enable_steering = bool(enabled)
+
+    def _silent_set_gated_steering(self, enabled: bool):
+        """静默开关 gated steering（不 print）"""
+        if not self._gated_steering_injected:
+            return
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return
+        for lid in self._gated_steering_layers:
+            if 0 <= lid < len(decoder_layers):
+                blk = decoder_layers[lid]
+                if isinstance(blk, GatedSteeredBlock):
+                    blk.enable_steering = bool(enabled)
+
+    def _snapshot_steering_state(self):
+        """保存当前 steering 开关状态，便于 TF 结束后恢复，避免影响外部脚本。"""
+        st = {"fixed": {}, "gated": {}}
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return st
+
+        for lid in self._steering_layers:
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], SteeredBlock):
+                st["fixed"][lid] = bool(decoder_layers[lid].enable_steering)
+
+        for lid in self._gated_steering_layers:
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], GatedSteeredBlock):
+                st["gated"][lid] = bool(decoder_layers[lid].enable_steering)
+
+        return st
+
+    def _restore_steering_state(self, st):
+        """恢复 steering 状态"""
+        try:
+            decoder_layers = self.model.model.layers
+        except AttributeError:
+            return
+
+        for lid, v in (st.get("fixed", {}) or {}).items():
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], SteeredBlock):
+                decoder_layers[lid].enable_steering = bool(v)
+
+        for lid, v in (st.get("gated", {}) or {}).items():
+            if 0 <= lid < len(decoder_layers) and isinstance(decoder_layers[lid], GatedSteeredBlock):
+                decoder_layers[lid].enable_steering = bool(v)
+
+    # ========= (NEW) stepwise teacher forcing for token-level diagnostics =========
+
+    @torch.no_grad()
+    def forward_for_probe_stepwise(
+        self,
+        image,
+        query_text: str,
+        answer_text: str,
+        use_image: bool = True,
+        steering_mode: str = "none",  # "none" | "global" | "oracle"
+        oracle_mask: Optional[List[bool]] = None,  # len == answer_len
+        steer_kind: str = "fixed",  # "fixed" | "gated" | "both"
+        compute_entropy: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        ✅ 逐 token 的 teacher forcing（带 KV cache），确保你的 SteeredBlock/GatedSteeredBlock 的 “last token 注入”
+        在每个 step 都生效，从而支持 try-oracle-gating。
+
+        返回：
+          - answer_ids: [A] CPU
+          - logprobs:   List[float] 长度 A，每个 token 的 log p(y_t | prefix)
+          - entropies:  List[float] 长度 A（可选）
+          - prompt_len: int
+        """
+
+        if steering_mode not in ("none", "global", "oracle"):
+            raise ValueError(f"steering_mode must be none/global/oracle, got {steering_mode}")
+        if steer_kind not in ("fixed", "gated", "both"):
+            raise ValueError(f"steer_kind must be fixed/gated/both, got {steer_kind}")
+
+        # build ids & image tensor (与原逻辑一致)
+        input_ids_full, image_tensor, prompt_len = self._build_qa_inputs_for_probe(
+            image=image,
+            query_text=query_text,
+            answer_text=answer_text,
+            with_image=use_image,
+        )
+
+        prompt_ids = input_ids_full[:, :prompt_len]       # [1, P]
+        answer_ids = input_ids_full[:, prompt_len:]       # [1, A]
+        A = int(answer_ids.shape[1])
+
+        if steering_mode == "oracle":
+            if oracle_mask is None:
+                raise ValueError("steering_mode=oracle requires oracle_mask")
+            if len(oracle_mask) != A:
+                raise ValueError(f"oracle_mask length {len(oracle_mask)} != answer_len {A}")
+
+        # 保存 & 恢复状态，确保不影响外部脚本
+        st0 = self._snapshot_steering_state()
+
+        def _set_enabled(enabled: bool):
+            if steer_kind in ("fixed", "both"):
+                self._silent_set_fixed_steering(enabled)
+            if steer_kind in ("gated", "both"):
+                self._silent_set_gated_steering(enabled)
+
+        logprobs: List[float] = []
+        entropies: List[float] = []
+
+        past = None
+        cur_input = prompt_ids  # 第一步用 prompt 预填充，预测 answer 第一个 token
+
+        try:
+            for t in range(A):
+                # --- 设置本 step 是否注入 ---
+                if steering_mode == "none":
+                    _set_enabled(False)
+                elif steering_mode == "global":
+                    _set_enabled(True)
+                else:  # oracle
+                    _set_enabled(bool(oracle_mask[t]))
+
+                outputs = self.model(
+                    cur_input,
+                    images=image_tensor,
+                    use_cache=True,
+                    past_key_values=past,
+                )
+                logits_last = outputs.logits[:, -1, :]  # [1, V]
+                past = outputs.past_key_values
+
+                # 当前目标 token
+                tgt = answer_ids[:, t]  # [1]
+
+                # logprob
+                logp = torch.log_softmax(logits_last, dim=-1)[0, int(tgt.item())].item()
+                logprobs.append(float(logp))
+
+                # entropy（可选）
+                if compute_entropy:
+                    p = torch.softmax(logits_last, dim=-1)
+                    H = (-(p * torch.log(p + 1e-12)).sum(dim=-1)[0]).item()
+                    entropies.append(float(H))
+
+                # 下一步输入：喂入当前 token（形状 [1,1]）
+                cur_input = tgt.view(1, 1)
+
+        finally:
+            # 恢复 steering 状态
+            self._restore_steering_state(st0)
+
+        return {
+            "answer_ids": answer_ids[0].detach().to("cpu"),
+            "logprobs": logprobs,
+            "entropies": entropies if compute_entropy else None,
+            "prompt_len": int(prompt_len),
         }

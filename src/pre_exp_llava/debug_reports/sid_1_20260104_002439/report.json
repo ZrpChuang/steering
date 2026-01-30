@@ -1,0 +1,107 @@
+{
+  "sid": 1,
+  "query": "Describe this image.",
+  "image_file": "AMBER_1.jpg",
+  "used_cache_for_img_forward": true,
+  "max_answer_tokens": 200,
+  "response_text_preview": "The image depicts a group of four people walking together in a grassy field, enjoying a pleasant day outdoors. They are walking in a line, with one person leading the way and the others following closely behind. The group appears to be a family, as they are all smiling and enjoying their time together.\n\nThe field is surrounded by trees, providing a serene and natural setting for their walk. The people are carrying backpacks, which suggests they might be on a hike or a day trip. The overall atmosphere of the scene is one of happiness and togetherness.",
+  "lens": {
+    "prompt_len_img": 48,
+    "prompt_len_noimg": 44,
+    "len_input_ids_img": 175,
+    "len_logits_img": 750,
+    "len_input_ids_noimg": 171,
+    "len_logits_noimg": 171,
+    "img_len_diff": 575
+  },
+  "img_token": {
+    "IMAGE_TOKEN_INDEX": -200,
+    "count": 1,
+    "positions_head": [
+      35
+    ],
+    "neg_positions_head": [
+      35
+    ]
+  },
+  "align_img": {
+    "candidate": "base",
+    "skip": 0,
+    "start_in_tail": 0,
+    "prompt_len": 48,
+    "input_len": 175,
+    "logits_len": 750,
+    "expansion": {
+      "len_input_ids": 175,
+      "len_logits": 750,
+      "diff": 575,
+      "n_img_tokens": 1,
+      "img_positions": [
+        35
+      ],
+      "extra_per_img": 575,
+      "num_patches": 576,
+      "ok": true
+    },
+    "decoded_aligned_answer_preview": "The image depicts a group of four people walking together in a grassy field, enjoying a pleasant day outdoors. They are walking in a line, with one person leading the way and the others following closely behind. The group appears to be a family, as they are all smiling and enjoying their time together.\n\nThe field is surrounded by trees, providing a serene and natural setting for their walk. The people are carrying backpacks, which suggests they might be on a hike or a day trip. The overall atmosphere of the scene is one of happiness and togetherness.",
+    "decoded_tail_context_preview": "The image depicts a group of four people walking together in a grassy field, enjoying a pleasant day outdoors. They are walking in a line, with one person leading the way and the others following closely behind. The group appears to be a family, as they are all smiling and enjoying their time together.\n\nThe field is surrounded by trees, providing a serene and natural setting for their walk. The people are carrying backpacks, which suggests they might be on a hike or a day trip. The overall atmosphere of the scene is one of happiness and togetherness."
+  },
+  "align_noimg": {
+    "candidate": "base",
+    "skip": 0,
+    "start_in_tail": 0,
+    "prompt_len": 44,
+    "input_len": 171,
+    "logits_len": 171,
+    "expansion": {
+      "len_input_ids": 171,
+      "len_logits": 171,
+      "diff": 0,
+      "n_img_tokens": 0,
+      "img_positions": [],
+      "extra_per_img": 0,
+      "num_patches": 1,
+      "ok": true
+    },
+    "decoded_aligned_answer_preview": "The image depicts a group of four people walking together in a grassy field, enjoying a pleasant day outdoors. They are walking in a line, with one person leading the way and the others following closely behind. The group appears to be a family, as they are all smiling and enjoying their time together.\n\nThe field is surrounded by trees, providing a serene and natural setting for their walk. The people are carrying backpacks, which suggests they might be on a hike or a day trip. The overall atmosphere of the scene is one of happiness and togetherness.",
+    "decoded_tail_context_preview": "The image depicts a group of four people walking together in a grassy field, enjoying a pleasant day outdoors. They are walking in a line, with one person leading the way and the others following closely behind. The group appears to be a family, as they are all smiling and enjoying their time together.\n\nThe field is surrounded by trees, providing a serene and natural setting for their walk. The people are carrying backpacks, which suggests they might be on a hike or a day trip. The overall atmosphere of the scene is one of happiness and togetherness."
+  },
+  "token_ids_same": true,
+  "summary": {
+    "T": 126,
+    "delta_mean_naive": -7.961721097620373,
+    "delta_neg_rate_naive": 1.0,
+    "delta_mean_fixed": 0.03860304524931441,
+    "delta_neg_rate_fixed": 0.7142857142857143,
+    "img_avg_nll_naive": 8.558707797750575,
+    "img_avg_nll_fixed": 0.5583836548808919,
+    "noimg_avg_nll": 0.5969867001302064,
+    "img_ppl_naive": 5211.941936067865,
+    "img_ppl_fixed": 1.7478450949920388,
+    "noimg_ppl": 1.8166364741413121
+  },
+  "files": {
+    "tokens_csv": "tokens.csv",
+    "align_img_json": "align_img.json",
+    "align_noimg_json": "align_noimg.json",
+    "generated_one_json": "generated_one.json"
+  },
+  "args": {
+    "sid": 1,
+    "inference_json": "",
+    "model_path": "/data/base_model/base_models_mllms/llava-v1.5-7b",
+    "model_base": null,
+    "conv_mode": "llava_v1",
+    "device": "cuda",
+    "seed": 42,
+    "question_file": "/data/ruipeng.zhang/dpo_on/AMBER/data/query/query_all.json",
+    "annotation": "/data/ruipeng.zhang/dpo_on/AMBER/data/annotations.json",
+    "image_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image",
+    "image_cache_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image_pre_llava",
+    "gen_max_new_tokens": 256,
+    "gen_temperature": 0.0,
+    "gen_num_beams": 1,
+    "max_answer_tokens": 200,
+    "out_dir": ""
+  }
+}

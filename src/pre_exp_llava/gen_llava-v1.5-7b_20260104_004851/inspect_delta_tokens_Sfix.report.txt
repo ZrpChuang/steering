@@ -1,0 +1,45 @@
+CSV: /data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851/delta_tokens_Sfix.csv.gz
+Delimiter detected: ',' | n_columns=10 | merge_text_col=token_str(idx=3)
+Rows parsed: 96,275
+Bad rows seen: 4,120 | repaired_merged=4,120 | repaired_padded=0
+
+=== Quick field exists check ===
+- id                  : True
+- k                   : False
+- match               : False
+- valid               : False
+- reason              : False
+- tok_id_img          : False
+- tok_id_no           : False
+- token_str           : True
+- token_piece         : False
+- delta               : True
+- delta_pre           : False
+- delta_post          : False
+- logp_img_post       : False
+- logp_no_match_post  : False
+- logp_img_pre        : False
+- logp_no_match_pre   : False
+
+=== Detected delta-like columns ===
+- delta: n=96,275 mean=0.21438727744482022 std=1.0854664159566323 sample_q_n=96,275
+    q01=-0.8652 q05=-0.5497 q25=-0.1659 q50=-0.01332 q75=0.0966 q95=2.018 q99=5.663
+
+=== Detected categorical columns (topK) ===
+- type: unique=4
+        36,677  function
+        33,398  other
+        25,527  object
+           673  hallu
+
+=== Missing rate (top 30 by missing count) ===
+- token_str                      missing=        49  rate=0.05%
+- id                             missing=         0  rate=0.00%
+- pos                            missing=         0  rate=0.00%
+- token_id                       missing=         0  rate=0.00%
+- logp_img                       missing=         0  rate=0.00%
+- logp_noimg                     missing=         0  rate=0.00%
+- delta                          missing=         0  rate=0.00%
+- type                           missing=         0  rate=0.00%
+- tf_cache                       missing=         0  rate=0.00%
+- align_skip                     missing=         0  rate=0.00%

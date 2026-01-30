@@ -1,0 +1,119 @@
+{
+  "args": {
+    "inference_json": "/data/ruipeng.zhang/dpo_on/AMBER_eval/output/AMBER_llava_responses_org.json",
+    "question_file": "/data/ruipeng.zhang/dpo_on/AMBER/data/query/query_all.json",
+    "image_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image",
+    "image_cache_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image_pre_llava",
+    "annotation": "/data/ruipeng.zhang/dpo_on/AMBER/data/annotations.json",
+    "word_association": "/data/ruipeng.zhang/dpo_on/AMBER/data/relation.json",
+    "safe_words": "/data/ruipeng.zhang/dpo_on/AMBER/data/safe_words.txt",
+    "model_path": "/data/base_model/base_models_mllms/llava-v1.5-7b",
+    "model_base": null,
+    "conv_mode": "llava_v1",
+    "device": "cuda",
+    "seed": 42,
+    "gen_max_new_tokens": 256,
+    "gen_temperature": 0.0,
+    "gen_num_beams": 1,
+    "max_answer_tokens": 200,
+    "max_samples": 3,
+    "similarity_score": 0.8,
+    "output_root": "/data/ruipeng.zhang/steering/src/pre_exp_llava",
+    "run_tag": "",
+    "save_token_csv": false
+  },
+  "notes": {
+    "noimg_definition": "use_image=False -> prompt 不含 image token 且 images=None（真正无图）",
+    "img_definition": "优先 cache pixel_values(<image_file>.pt)；cache miss 回退 PIL+preprocess",
+    "max_answer_tokens": 200,
+    "rate_definition": "rate[k]=count[k]/denom[k], denom[k]=#(len>=k)",
+    "visual_sensitivity": "Δ_t = logp_img(x_t) - logp_noimg(x_t) on teacher-forced response tokens",
+    "ppl": "PPL_img = exp(mean NLL over truncated tokens)",
+    "inference_policy": "given inference-json -> read only; else generate and save generated_inference.json",
+    "offset_policy": "NO fast tokenizer offset_mapping; offsets recovered via prefix decode diff (same tokenizer, self-consistent)",
+    "logits_alignment_fix": "If logits_len >> input_len and IMAGE_TOKEN_INDEX exists, map input index j -> expanded index j_exp then use logits[j_exp-1]."
+  },
+  "tf_cache": {
+    "cache_folder": "/data/ruipeng.zhang/dpo_on/playground/AMBER_image_pre_llava",
+    "hit": 3,
+    "miss": 0
+  },
+  "alignment_expansion_stats": {
+    "n_samples_ok": 3,
+    "n_need_fix_img": 3,
+    "n_fix_ok_img": 3,
+    "diff_hist_img": {
+      "575": 3
+    },
+    "extra_hist_img": {
+      "575": 3
+    }
+  },
+  "delta_summary": {
+    "__all__": {
+      "delta": {
+        "n": 324,
+        "mean": 0.18491199870168426,
+        "median": -0.0124664306640625
+      },
+      "abs_delta": {
+        "n": 324,
+        "mean": 0.4367080029146171,
+        "median": 0.1493663787841797
+      }
+    },
+    "function": {
+      "delta": {
+        "n": 129,
+        "mean": -0.020724570104318073,
+        "median": -0.038143157958984375
+      },
+      "abs_delta": {
+        "n": 129,
+        "mean": 0.251337539317996,
+        "median": 0.174530029296875
+      }
+    },
+    "hallu": {
+      "delta": {
+        "n": 3,
+        "mean": -0.19986788431803384,
+        "median": -0.0002727508544921875
+      },
+      "abs_delta": {
+        "n": 3,
+        "mean": 0.19986788431803384,
+        "median": 0.0002727508544921875
+      }
+    },
+    "object": {
+      "delta": {
+        "n": 78,
+        "mean": 0.1739353033212515,
+        "median": -0.02683734893798828
+      },
+      "abs_delta": {
+        "n": 78,
+        "mean": 0.43758140466152096,
+        "median": 0.11757850646972656
+      }
+    },
+    "other": {
+      "delta": {
+        "n": 114,
+        "mean": 0.435242167690344,
+        "median": -0.00031280517578125
+      },
+      "abs_delta": {
+        "n": 114,
+        "mean": 0.6521043610154537,
+        "median": 0.1506786346435547
+      }
+    }
+  },
+  "ppl_img_summary": {
+    "n": 3,
+    "mean": 1.7700804637034304,
+    "median": 1.8069151424002265
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "csv_path": "/data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851/delta_tokens_Sfix.csv.gz",
+  "delimiter_detected": {
+    "delimiter": ",",
+    "n_columns": 10,
+    "merge_text_col_idx": 3,
+    "merge_text_col_name": "token_str"
+  },
+  "total_rows_parsed": 96275,
+  "bad_rows_seen": 4120,
+  "repaired_rows": {
+    "merged_extra": 4120,
+    "padded_missing": 0
+  },
+  "columns": [
+    {
+      "name": "id",
+      "missing": 0
+    },
+    {
+      "name": "pos",
+      "missing": 0
+    },
+    {
+      "name": "token_id",
+      "missing": 0
+    },
+    {
+      "name": "token_str",
+      "missing": 49
+    },
+    {
+      "name": "logp_img",
+      "missing": 0
+    },
+    {
+      "name": "logp_noimg",
+      "missing": 0
+    },
+    {
+      "name": "delta",
+      "missing": 0
+    },
+    {
+      "name": "type",
+      "missing": 0
+    },
+    {
+      "name": "tf_cache",
+      "missing": 0
+    },
+    {
+      "name": "align_skip",
+      "missing": 0
+    }
+  ],
+  "field_exists_quickcheck": {
+    "id": true,
+    "k": false,
+    "match": false,
+    "valid": false,
+    "reason": false,
+    "tok_id_img": false,
+    "tok_id_no": false,
+    "token_str": true,
+    "token_piece": false,
+    "delta": true,
+    "delta_pre": false,
+    "delta_post": false,
+    "logp_img_post": false,
+    "logp_no_match_post": false,
+    "logp_img_pre": false,
+    "logp_no_match_pre": false
+  },
+  "detected_delta_columns": [
+    "delta"
+  ],
+  "detected_categorical_columns": [
+    "type"
+  ],
+  "numeric_summary(delta_like)": {
+    "delta": {
+      "n": 96275,
+      "mean": 0.21438727744482022,
+      "std": 1.0854664159566323,
+      "sample_n_for_quantiles": 96275,
+      "quantiles_from_sample": {
+        "q01": -0.8651976,
+        "q05": -0.5497057999999999,
+        "q25": -0.165905,
+        "q50": -0.013319,
+        "q75": 0.0965955,
+        "q95": 2.0180414000000026,
+        "q99": 5.6625485399999755
+      }
+    }
+  },
+  "categorical_summary(topk)": {
+    "type": {
+      "unique_count": 4,
+      "topk": [
+        {
+          "value": "function",
+          "count": 36677
+        },
+        {
+          "value": "other",
+          "count": 33398
+        },
+        {
+          "value": "object",
+          "count": 25527
+        },
+        {
+          "value": "hallu",
+          "count": 673
+        }
+      ]
+    }
+  }
+}

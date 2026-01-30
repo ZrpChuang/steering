@@ -1,0 +1,19 @@
+mode = scored-json -> extract case -> save raw -> plot
+scored_json = /data/ruipeng.zhang/steering/src/pre_diss_llava/diss_run_1000/all_candidates_scored.json
+case_id = 75
+score = 0.8900643674656888
+tau = 0.2
+plot_soft = True
+save_png = True (png_dpi=200)
+
+[Global]
+  waste_ratio      = 0.9412
+  hallu_coverage   = 0.6667
+  mean_delta_hallu = 0.5761
+  impactful_rate   = 0.2615
+
+[Soft/Oracle]
+  waste_ratio      = 0.0000
+  hallu_coverage   = 0.3333
+  mean_delta_hallu = 0.2304
+  impactful_rate   = 0.0077

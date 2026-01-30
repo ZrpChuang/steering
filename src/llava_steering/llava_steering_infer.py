@@ -252,12 +252,12 @@ def parse_args():
         "--steer-layers",
         type=str,
         default="17,18,19,20",
-        help="需要加 steering 的层号，逗号分隔，例如 '13,14,15,16'",
+        help="需要加 steering 的层号，逗号分隔",
     )
     parser.add_argument(
         "--lambda-scale",
         type=float,
-        default=2.0,
+        default=0.6,
         help="steering 强度 λ，全局缩放系数",
     )
     parser.add_argument(

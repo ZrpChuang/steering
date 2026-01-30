@@ -1,25 +1,22 @@
-# src/llava_adapter/qwen2_5_vl_wrapper.py
+# src/qwen_adapter/qwen_wrapper.py
 # -*- coding: utf-8 -*-
 import os
-from typing import List, Dict, Any, Optional, Callable
+import math
+from typing import List, Dict, Any, Optional, Callable, Tuple
 
 import torch
 from torch import nn
 from transformers import set_seed, AutoProcessor
 
-# ========= 1. Qwen2.5-VL 模型类导入 =========
-# 优先从 transformers 顶层导入；若版本太老没有 alias，就从子模块兜底。
 try:
     from transformers import Qwen2_5_VLForConditionalGeneration
 except ImportError:
-    from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import (  # type: ignore
-        Qwen2_5_VLForConditionalGeneration,
-    )
+    from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLForConditionalGeneration  # type: ignore
 
 import numpy as np
 
+print(f"[qwen_wrapper] loaded from: {__file__}")  # ★ 用来排查你是不是在用旧文件
 
-# ========= 2. Steering 辅助：probe 加载 + SteeredBlock =========
 
 def _to_str_local(x) -> str:
     if isinstance(x, str):
@@ -33,10 +30,6 @@ def load_probes_and_build_dirs_local(
     normalize: bool = True,
     direction: str = "more_visual",
 ) -> Dict[int, torch.Tensor]:
-    """
-    从 binary_probes_by_range.npz 里读出每层的 w_l，构造 steering 方向向量。
-    返回: layer_id -> direction_l (torch.FloatTensor, [hidden_dim])
-    """
     probe_path = os.path.expanduser(probe_path)
     data = np.load(probe_path)
 
@@ -50,9 +43,7 @@ def load_probes_and_build_dirs_local(
     for lid in steer_layers:
         lname = f"layer_{lid}"
         if lname not in name2idx:
-            raise ValueError(
-                f"probe 文件里没有 {lname}，可用层名: {layer_names}"
-            )
+            raise ValueError(f"probe 文件里没有 {lname}，可用层名: {layer_names}")
         row = name2idx[lname]
         w_np = W[row]
         w = torch.from_numpy(w_np).float()
@@ -69,8 +60,6 @@ def load_probes_and_build_dirs_local(
 
 
 class SteeredBlock(nn.Module):
-    """包装 Qwen 解码层，在 forward 里额外加上 steering 向量（最后一个 token）。"""
-
     def __init__(
         self,
         base_block: nn.Module,
@@ -96,7 +85,7 @@ class SteeredBlock(nn.Module):
             rest = None
             is_tuple = False
 
-        if (not self.enable_steering) or (hidden is None) or (hidden.dim() != 3):
+        if (not self.enable_steering) or (hidden is None) or (not isinstance(hidden, torch.Tensor)) or (hidden.dim() != 3):
             return out
 
         d = self.direction_vec.to(device=hidden.device, dtype=hidden.dtype)
@@ -105,38 +94,22 @@ class SteeredBlock(nn.Module):
 
         if is_tuple:
             return (hidden, *rest)
-        else:
-            return hidden
+        return hidden
 
-
-# ========= 3. Qwen2.5-VL Hooked Model =========
 
 class QwenVLHookedModel(nn.Module):
-    """
-    Qwen2.5-VL 版本的“HookedModel”：
-    - 加载 Qwen2_5_VLForConditionalGeneration + AutoProcessor
-    - 提供 register_hidden_hooks / inject_steering_blocks_from_probes / forward_for_probe
-    - generate() 内部走官方推荐的 apply_chat_template 流程
-    """
-
     def __init__(
         self,
-        model_path: str = "/data/base_model/models--Qwen--Qwen2.5-VL-7B-Instruct/snapshots/cc594898137f460bfe9f0759e9844b3ce807cfb5",
+        model_path: str,
         device: str = "cuda",
         dtype: torch.dtype = torch.bfloat16,
         seed: int = 42,
         processor_kwargs: Optional[Dict[str, Any]] = None,
         model_kwargs: Optional[Dict[str, Any]] = None,
     ):
-        """
-        :param model_path: HF hub 或本地路径，例如 "Qwen/Qwen2.5-VL-7B-Instruct"
-        :param device: "cuda" / "cpu"
-        :param dtype: torch.bfloat16 / float16 等
-        :param processor_kwargs: 传给 AutoProcessor.from_pretrained 的参数（例如 min_pixels / max_pixels）
-        :param model_kwargs: 传给 from_pretrained 的额外参数（例如 attn_implementation="flash_attention_2"）
-        """
         super().__init__()
 
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
         set_seed(seed)
 
         self.device = device
@@ -144,40 +117,39 @@ class QwenVLHookedModel(nn.Module):
 
         processor_kwargs = processor_kwargs or {}
         model_kwargs = model_kwargs or {}
-
-        # 如果没指定 device_map，就手动 to(device)，方便和 steering 逻辑统一。
         model_kwargs.setdefault("torch_dtype", dtype)
         model_kwargs.setdefault("device_map", None)
 
         print(f"[QwenVLHookedModel] Loading Qwen2.5-VL from: {model_path}")
         self.model: Qwen2_5_VLForConditionalGeneration = (
-            Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                model_path,
-                **model_kwargs,
-            )
+            Qwen2_5_VLForConditionalGeneration.from_pretrained(model_path, **model_kwargs)
         )
         self.model.to(device)
         self.model.eval()
+        # ---- FIX: 某些 checkpoint / transformers 版本会把 generation_config.temperature 设成很小值(如1e-06)
+        # 在 do_sample=False 时会触发 warning。这里统一重置为默认温度 1.0，并关闭采样。
+        try:
+            gc = getattr(self.model, "generation_config", None)
+            if gc is not None:
+                gc.do_sample = False
+                gc.temperature = 1.0
+                # 下面这些采样相关参数也顺手回到默认，避免未来其它 warning
+                if hasattr(gc, "top_p"):
+                    gc.top_p = 1.0
+                if hasattr(gc, "top_k"):
+                    gc.top_k = 50
+        except Exception:
+            pass
 
         self.processor = AutoProcessor.from_pretrained(model_path, **processor_kwargs)
-
-        # 方便和 LLaVA 版保持接口一致（有些代码可能要用 tokenizer）
         self.tokenizer = getattr(self.processor, "tokenizer", None)
 
-        # hook & steering 管理
         self._hook_handles: List[Any] = []
         self._hook_buffers: Dict[str, List[torch.Tensor]] = {}
 
-        self._steering_layers: List[int] = []
-        self._steering_injected: bool = False
-
-    # ========= 3.0 通用：把 processor 输出搬到正确 device/dtype =========
+    # ---------------- utils ----------------
 
     def _move_inputs_to_device(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        把 apply_chat_template / processor 返回的 BatchEncoding or dict
-        统一搬到 self.device 上，pixel_values 等用模型 dtype。
-        """
         device = self.device
         model_dtype = getattr(self.model, "dtype", self.dtype)
 
@@ -192,20 +164,57 @@ class QwenVLHookedModel(nn.Module):
                 moved[k] = v
         return moved
 
-    # ========= 3.1 decoder 层定位 =========
+    def _ensure_batch_dim(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(inputs)
+
+        def _unsq(key: str):
+            if key not in out or not isinstance(out[key], torch.Tensor):
+                return
+            t = out[key]
+            if key in ("input_ids", "attention_mask", "position_ids"):
+                if t.dim() == 1:
+                    out[key] = t.unsqueeze(0)
+            if key in ("pixel_values", "pixel_values_videos"):
+                if t.dim() == 3:
+                    out[key] = t.unsqueeze(0)
+            if key in ("image_grid_thw", "video_grid_thw"):
+                if t.dim() == 1:
+                    out[key] = t.unsqueeze(0)
+
+        for k in ("input_ids", "attention_mask", "position_ids",
+                  "pixel_values", "image_grid_thw",
+                  "pixel_values_videos", "video_grid_thw"):
+            _unsq(k)
+
+        return out
+
+    # ---------------- hooks ----------------
+
+    def _make_hook(self, name: str) -> Callable:
+        def hook(module, input, output):
+            if isinstance(output, torch.Tensor):
+                last_token = output[:, -1, :].detach().to("cpu")
+            else:
+                last_token = output[0][:, -1, :].detach().to("cpu")
+            if name not in self._hook_buffers:
+                self._hook_buffers[name] = []
+            self._hook_buffers[name].append(last_token)
+        return hook
+
+    def clear_hooks(self):
+        for h in self._hook_handles:
+            h.remove()
+        self._hook_handles = []
+
+    def pop_hook_buffers(self) -> Dict[str, List[torch.Tensor]]:
+        buffers = self._hook_buffers
+        self._hook_buffers = {}
+        return buffers
+
+    # ---------------- steering ----------------
 
     def _get_decoder_layers(self):
-        """
-        在不同 transformers 版本的 Qwen2.5-VL 中，decoder 层的路径可能略有差异。
-        这里统一做一个“自动探测”：
-          1) self.model.model.language_model.layers
-          2) self.model.model.layers
-          3) self.model.language_model.layers
-          4) self.model.layers
-        找到第一个存在并且是 ModuleList 的就用它。
-        """
         base = self.model
-
         candidates = []
 
         if hasattr(base, "model"):
@@ -223,53 +232,10 @@ class QwenVLHookedModel(nn.Module):
 
         for name, layers in candidates:
             if isinstance(layers, (nn.ModuleList, list, tuple)) and len(layers) > 0:
-                print(f"[QwenVLHookedModel] 使用 decoder 层路径: self.model.{name}")
+                print(f"[QwenVLHookedModel] decoder layers path: self.model.{name}")
                 return layers
 
-        raise RuntimeError(
-            "无法在 Qwen2.5-VL 模型中找到 decoder layers，请打印 self.model 结构确认。"
-        )
-
-    # ========= 3.2 hook 相关 =========
-
-    def _make_hook(self, name: str) -> Callable:
-        def hook(module, input, output):
-            if isinstance(output, torch.Tensor):
-                last_token = output[:, -1, :].detach().to("cpu")
-            else:
-                last_token = output[0][:, -1, :].detach().to("cpu")
-
-            if name not in self._hook_buffers:
-                self._hook_buffers[name] = []
-            self._hook_buffers[name].append(last_token)
-
-        return hook
-
-    def register_hidden_hooks(self, layer_indices: List[int]):
-        self.clear_hooks()
-        self._hook_buffers.clear()
-
-        decoder_layers = self._get_decoder_layers()
-        n_layers = len(decoder_layers)
-
-        for idx in layer_indices:
-            if idx < 0 or idx >= n_layers:
-                raise ValueError(f"layer index {idx} 超出范围 [0, {n_layers - 1}]")
-            layer = decoder_layers[idx]
-            handle = layer.register_forward_hook(self._make_hook(name=f"layer_{idx}"))
-            self._hook_handles.append(handle)
-
-    def clear_hooks(self):
-        for h in self._hook_handles:
-            h.remove()
-        self._hook_handles = []
-
-    def pop_hook_buffers(self) -> Dict[str, List[torch.Tensor]]:
-        buffers = self._hook_buffers
-        self._hook_buffers = {}
-        return buffers
-
-    # ========= 3.3 steering block 注入 =========
+        raise RuntimeError("找不到 decoder layers。")
 
     def inject_steering_blocks_from_probes(
         self,
@@ -280,7 +246,6 @@ class QwenVLHookedModel(nn.Module):
         direction: str = "more_visual",
     ):
         decoder_layers = self._get_decoder_layers()
-
         dirs = load_probes_and_build_dirs_local(
             probe_path=probe_path,
             steer_layers=steer_layers,
@@ -293,9 +258,7 @@ class QwenVLHookedModel(nn.Module):
 
         for lid in steer_layers:
             if lid < 0 or lid >= len(decoder_layers):
-                raise ValueError(
-                    f"steer_layers 中的层号 {lid} 超出范围 [0, {len(decoder_layers)-1}]"
-                )
+                raise ValueError(f"layer {lid} 超出范围")
 
             base_block = decoder_layers[lid]
             dir_vec = dirs[lid].to(device=model_device, dtype=model_dtype)
@@ -304,77 +267,232 @@ class QwenVLHookedModel(nn.Module):
                 base_block.direction_vec = dir_vec
                 base_block.lambda_scale = float(lambda_scale)
                 base_block.enable_steering = True
-                print(f"[steering-block] 更新已有 SteeredBlock: layer_{lid}, lambda={lambda_scale:.4f}")
             else:
-                steered_block = SteeredBlock(
+                decoder_layers[lid] = SteeredBlock(
                     base_block=base_block,
                     direction_vec=dir_vec,
                     lambda_scale=lambda_scale,
                     enable_steering=True,
                 )
-                decoder_layers[lid] = steered_block
-                print(f"[steering-block] 替换为 SteeredBlock: layer_{lid}, lambda={lambda_scale:.4f}")
 
-        self._steering_layers = list(steer_layers)
-        self._steering_injected = True
-
-    def enable_steering(self):
-        if not self._steering_injected:
-            return
-        decoder_layers = self._get_decoder_layers()
-        for lid in self._steering_layers:
-            if 0 <= lid < len(decoder_layers):
-                layer = decoder_layers[lid]
-                if isinstance(layer, SteeredBlock):
-                    layer.enable_steering = True
-        print(f"[steering-block] enable_steering: {self._steering_layers}")
-
-    def disable_steering(self):
-        if not self._steering_injected:
-            return
-        decoder_layers = self._get_decoder_layers()
-        for lid in self._steering_layers:
-            if 0 <= lid < len(decoder_layers):
-                layer = decoder_layers[lid]
-                if isinstance(layer, SteeredBlock):
-                    layer.enable_steering = False
-        print(f"[steering-block] disable_steering: {self._steering_layers}")
-
-    # ========= 3.4 构造多模态 messages & inputs =========
+    # ---------------- building inputs ----------------
 
     @staticmethod
     def _build_messages(image, query_text: str):
         content: List[Dict[str, Any]] = []
         if image is not None:
-            # 这里直接把 PIL.Image 交给 processor，和官方示例一致
             content.append({"type": "image", "image": image})
         content.append({"type": "text", "text": query_text})
-        messages = [{"role": "user", "content": content}]
-        return messages
+        return [{"role": "user", "content": content}]
 
-    def _build_inputs(self, image, query_text: str):
-        """
-        使用 AutoProcessor.apply_chat_template 直接构造 Qwen2.5-VL 需要的全部输入：
-        包括 input_ids / attention_mask / position_ids / pixel_values / image_grid_thw 等。
-        """
+    def _build_inputs(self, image, query_text: str) -> Dict[str, Any]:
         messages = self._build_messages(image, query_text)
-
-        raw_inputs = self.processor.apply_chat_template(
+        raw = self.processor.apply_chat_template(
             messages,
             add_generation_prompt=True,
             tokenize=True,
             return_tensors="pt",
             return_dict=True,
         )
-        inputs = self._move_inputs_to_device(raw_inputs)
-        return inputs
+        return self._move_inputs_to_device(dict(raw))
 
-    # ========= 3.5 推理 generate =========
+    # ----------------关键修复：image token 数对齐----------------
+
+    def _get_spatial_merge_size(self) -> int:
+        try:
+            cfg = getattr(self.model, "config", None)
+            vc = getattr(cfg, "vision_config", None) if cfg is not None else None
+            for key in ("spatial_merge_size", "spatial_merge", "merge_size"):
+                if vc is not None and hasattr(vc, key):
+                    ms = getattr(vc, key)
+                    ms = int(ms)  # 可能是 numpy/int
+                    return max(1, ms)
+        except Exception:
+            pass
+        return 1
+
+    @staticmethod
+    def _grid_to_thw(grid: torch.Tensor) -> Tuple[int, int, int]:
+        g = grid.detach().to("cpu")
+        if g.dim() == 2 and g.shape[0] == 1:
+            g = g[0]
+        arr = [int(x) for x in g.tolist()]
+        if len(arr) == 3:
+            return arr[0], arr[1], arr[2]
+        if len(arr) == 2:
+            return 1, arr[0], arr[1]
+        if len(arr) == 1:
+            return 1, 1, arr[0]
+        return 1, 1, 1
+
+    def _expected_image_token_count(self, image_grid_thw: torch.Tensor) -> int:
+        t, h, w = self._grid_to_thw(image_grid_thw)
+        ms = self._get_spatial_merge_size()
+        denom = max(1, ms * ms)
+        raw = t * h * w
+        if raw % denom == 0:
+            expect = raw // denom
+        else:
+            # 极少见：不整除时，用 ceil，但这时候你 cache/processor 很可能不一致
+            expect = int(math.ceil(raw / denom))
+        return max(1, int(expect))
+
+    @staticmethod
+    def _find_subsequence(hay: List[int], needle: List[int]) -> int:
+        if not needle or len(needle) > len(hay):
+            return -1
+        # 朴素查找足够快（prompt 很短）
+        first = needle[0]
+        for i in range(0, len(hay) - len(needle) + 1):
+            if hay[i] != first:
+                continue
+            if hay[i:i + len(needle)] == needle:
+                return i
+        return -1
+
+    def build_text_inputs_with_image_placeholder(
+        self,
+        query_text: str,
+        image_grid_thw: torch.Tensor,
+        return_tensors: str = "pt",
+        add_generation_prompt: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        ✅ 最稳做法：不走 apply_chat_template 的 image 分支
+        1) 纯文本 chat_template 里塞一个 marker
+        2) token 化后定位 marker 的 token subseq
+        3) 用 token id 直接替换为 <|vision_start|> + image_pad*N + <|vision_end|> + '\n'
+        """
+        if self.tokenizer is None:
+            raise RuntimeError("processor.tokenizer 不存在")
+
+        if not isinstance(image_grid_thw, torch.Tensor):
+            raise RuntimeError("image_grid_thw 必须是 torch.Tensor")
+
+        n_img = self._expected_image_token_count(image_grid_thw)
+
+        vision_start_id = self.tokenizer.convert_tokens_to_ids("<|vision_start|>")
+        vision_end_id = self.tokenizer.convert_tokens_to_ids("<|vision_end|>")
+        image_pad_id = self.tokenizer.convert_tokens_to_ids("<|image_pad|>")
+
+        for name, tid in [("vision_start", vision_start_id), ("vision_end", vision_end_id), ("image_pad", image_pad_id)]:
+            if tid is None or int(tid) < 0:
+                raise RuntimeError(f"tokenizer 缺少 <|{name}|> / <|image_pad|> 等特殊 token：{name}={tid}")
+
+        marker = "§§§__IMG_PLACEHOLDER__7f3a2c__§§§"
+        # 用换行把 marker 和 query 分开，避免 tokenizer 把它们粘在一起
+        text_with_marker = marker + "\n" + query_text
+
+        messages = [{
+            "role": "user",
+            "content": [{"type": "text", "text": text_with_marker}],
+        }]
+
+        raw = self.processor.apply_chat_template(
+            messages,
+            add_generation_prompt=add_generation_prompt,
+            tokenize=True,
+            return_tensors=return_tensors,
+            return_dict=True,
+        )
+        raw = dict(raw)
+        ids = raw["input_ids"][0].tolist()
+
+        marker_ids = self.tokenizer.encode(marker, add_special_tokens=False)
+        pos = self._find_subsequence(ids, marker_ids)
+        if pos < 0:
+            # 极端兜底：直接在最前面插 vision 段（一般不会走到这）
+            pos = 0
+            marker_ids = []
+
+        newline_ids = self.tokenizer.encode("\n", add_special_tokens=False)
+
+        vision_seg = [int(vision_start_id)] + [int(image_pad_id)] * int(n_img) + [int(vision_end_id)] + newline_ids
+
+        new_ids = ids[:pos] + vision_seg + ids[pos + len(marker_ids):]
+
+        input_ids = torch.tensor(new_ids, dtype=torch.long).unsqueeze(0)
+        attention_mask = torch.ones_like(input_ids)
+
+        # debug：看最终到底插了多少 image_pad
+        if os.getenv("QWEN_DEBUG_IMAGE_TOKENS", "0") == "1":
+            cnt = sum(1 for x in new_ids if x == int(image_pad_id))
+            t, h, w = self._grid_to_thw(image_grid_thw)
+            ms = self._get_spatial_merge_size()
+            print(f"[debug] grid=({t},{h},{w}) merge={ms} expect={n_img} got_image_pad={cnt}")
+
+        return self._move_inputs_to_device({"input_ids": input_ids, "attention_mask": attention_mask})
+
+    # ---------------- generation ----------------
+
+    @torch.no_grad()
+    def generate_from_inputs(
+        self,
+        inputs: Dict[str, Any],
+        max_new_tokens: int = 64,
+        temperature: float = 0.0,
+        num_beams: int = 1,
+        **gen_kwargs,
+    ) -> Dict[str, Any]:
+        allowed_keys = {
+            "input_ids", "attention_mask", "position_ids",
+            "pixel_values", "image_grid_thw",
+            "pixel_values_videos", "video_grid_thw",
+            "inputs_embeds",
+        }
+        filtered = {k: v for k, v in inputs.items() if k in allowed_keys}
+        filtered = self._ensure_batch_dim(filtered)
+
+        # ★ 可选：在这里做一次强校验，避免“旧 full-cache”污染
+        if os.getenv("QWEN_STRICT_IMAGE_TOKEN_CHECK", "0") == "1":
+            try:
+                if "image_grid_thw" in filtered and "input_ids" in filtered:
+                    grid = filtered["image_grid_thw"]
+                    expect = self._expected_image_token_count(grid)
+                    image_pad_id = int(self.tokenizer.convert_tokens_to_ids("<|image_pad|>"))
+                    got = int((filtered["input_ids"][0] == image_pad_id).sum().item())
+                    if got != expect:
+                        raise RuntimeError(f"[strict] image_pad mismatch: got={got} expect={expect}")
+            except Exception as e:
+                raise
+
+        model_inputs = self._move_inputs_to_device(filtered)
+
+        temp = float(temperature)
+        if 0.0 < abs(temp) < 1e-5:
+            temp = 0.0
+
+        do_sample = temp > 0.0
+        gen_kwargs.setdefault("do_sample", do_sample)
+        gen_kwargs.setdefault("num_beams", num_beams)
+
+        if do_sample:
+            gen_kwargs.setdefault("temperature", temp)
+        else:
+            gen_kwargs.pop("temperature", None)
+
+        output_ids = self.model.generate(
+            **model_inputs,
+            max_new_tokens=max_new_tokens,
+            **gen_kwargs,
+        )
+
+        in_ids = model_inputs["input_ids"]
+        gen_only = [out_ids[len(inp_ids):] for inp_ids, out_ids in zip(in_ids, output_ids)]
+        texts = self.processor.batch_decode(
+            gen_only,
+            skip_special_tokens=True,
+            clean_up_tokenization_spaces=True,
+        )
+        output_text = texts[0].strip() if texts else ""
+
+        hook_buffers = self.pop_hook_buffers()
+        return {"output_text": output_text, "hook_buffers": hook_buffers}
 
     @torch.no_grad()
     def generate(
         self,
-        image,          # PIL.Image.Image 或 None
+        image,
         query_text: str,
         max_new_tokens: int = 64,
         temperature: float = 0.0,
@@ -382,61 +500,23 @@ class QwenVLHookedModel(nn.Module):
         **gen_kwargs,
     ) -> Dict[str, Any]:
         inputs = self._build_inputs(image=image, query_text=query_text)
-
-        do_sample = temperature > 0.0
-        gen_kwargs.setdefault("do_sample", do_sample)
-        gen_kwargs.setdefault("num_beams", num_beams)
-
-        output_ids = self.model.generate(
-            **inputs,
+        return self.generate_from_inputs(
+            inputs=inputs,
             max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            num_beams=num_beams,
             **gen_kwargs,
         )
 
-        # 按官方用法：把输入部分切掉，只 decode 新生成的 token
-        in_ids = inputs["input_ids"]
-        gen_only = [
-            out_ids[len(inp_ids):]
-            for inp_ids, out_ids in zip(in_ids, output_ids)
-        ]
-        texts = self.processor.batch_decode(
-            gen_only,
-            skip_special_tokens=True,
-            clean_up_tokenization_spaces=True,
-        )
-        output_text = texts[0].strip() if len(texts) > 0 else ""
+    # ---------------- probe forward（保留）----------------
 
-        hook_buffers = self.pop_hook_buffers()
-        return {
-            "output_text": output_text,
-            "hook_buffers": hook_buffers,
-        }
-
-    # ========= 3.6 Probe 用：question + answer 的前向 =========
-
-    def _build_qa_inputs_for_probe(
-        self,
-        image,
-        query_text: str,
-        answer_text: str,
-        use_image: bool = True,
-    ):
-        """
-        构造“question + answer”的完整输入，并返回：
-        - inputs_full: 用于一次性 forward 的 BatchEncoding（含多模态字段）
-        - prompt_len: prefix（问题 + assistant 开头）长度，用于区分 answer token
-        """
-
-        # user 内容（图 + 文 / 仅文）
+    def _build_qa_inputs_for_probe(self, image, query_text: str, answer_text: str, use_image: bool = True):
         user_content: List[Dict[str, Any]] = []
         if use_image and (image is not None):
             user_content.append({"type": "image", "image": image})
         user_content.append({"type": "text", "text": query_text})
 
-        # 1) prompt-only：只有 user，add_generation_prompt=True，用来测 prefix 长度
-        conv_prompt = [
-            {"role": "user", "content": user_content},
-        ]
+        conv_prompt = [{"role": "user", "content": user_content}]
         prompt_inputs = self.processor.apply_chat_template(
             conv_prompt,
             add_generation_prompt=True,
@@ -446,15 +526,11 @@ class QwenVLHookedModel(nn.Module):
         )
         prompt_len = int(prompt_inputs["input_ids"].shape[1])
 
-        # 2) full：user + assistant(answer)，assistant 也走多模态格式（list[{"type": "text"}]）
-        assistant_content = [
-            {"type": "text", "text": answer_text},
-        ]
+        assistant_content = [{"type": "text", "text": answer_text}]
         conv_full = [
-            {"role": "user", "content": user_content},              # user: [image?, text]
-            {"role": "assistant", "content": assistant_content},    # assistant: [text]
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": assistant_content},
         ]
-
         inputs_full = self.processor.apply_chat_template(
             conv_full,
             add_generation_prompt=False,
@@ -465,46 +541,22 @@ class QwenVLHookedModel(nn.Module):
         return inputs_full, prompt_len
 
     @torch.no_grad()
-    def forward_for_probe(
-        self,
-        image,
-        query_text: str,
-        answer_text: str,
-        use_image: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        对 (question, answer) 做一次 teacher-forcing 前向，
-        返回:
-          - input_ids: [T]
-          - logits: [T, V]
-          - hidden_states: Dict[layer_name -> [T, d]]
-          - prompt_len: int
-
-        use_image=True  -> 多模态（图 + 文）
-        use_image=False -> 纯文本（不传图），用于 Δ_word 里的有图/无图对比。
-        """
+    def forward_for_probe(self, image, query_text: str, answer_text: str, use_image: bool = True) -> Dict[str, Any]:
         inputs_full, prompt_len = self._build_qa_inputs_for_probe(
             image=image,
             query_text=query_text,
             answer_text=answer_text,
             use_image=use_image,
         )
+        model_inputs = self._move_inputs_to_device(dict(inputs_full))
+        outputs = self.model(**model_inputs, output_hidden_states=True, use_cache=False)
 
-        # 关键：统一搬到 device，避免 CPU/CUDA 混用
-        model_inputs = self._move_inputs_to_device(inputs_full)
+        logits = outputs.logits[0].detach().to("cpu")
 
-        outputs = self.model(
-            **model_inputs,
-            output_hidden_states=True,
-            use_cache=False,
-        )
-
-        logits = outputs.logits[0].detach().to("cpu")  # [T, V]
-
-        hidden_states = outputs.hidden_states  # len = L+1
+        hidden_states = outputs.hidden_states
         hidden_dict: Dict[str, torch.Tensor] = {}
-        for layer_idx, h in enumerate(hidden_states[1:]):  # 跳过 embedding
-            hidden_dict[f"layer_{layer_idx}"] = h[0].detach().to("cpu")  # [T, d]
+        for layer_idx, h in enumerate(hidden_states[1:]):
+            hidden_dict[f"layer_{layer_idx}"] = h[0].detach().to("cpu")
 
         return {
             "input_ids": model_inputs["input_ids"][0].detach().to("cpu"),

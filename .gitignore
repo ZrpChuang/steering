@@ -1,2 +1,14 @@
 *.pyc\n__pycache__\n.env\n.DS_Store\n*.log
 src/llava_extract_hidden/artifacts/
+/data/ruipeng.zhang/steering/demo_picture
+/data/ruipeng.zhang/steering/src/pre_diss_llava
+*.log
+steering/src/pre_diss_llava
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.bmp
+*.tif
+*.tiff
+*.gif

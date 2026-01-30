@@ -1,0 +1,83 @@
+Top 20 tokens by |delta| (with context)
+csv=/data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851/delta_tokens_Sfix.csv.gz
+
+[01] id=391 pos=11 type=object token_id=11232 delta=14.814219 |delta|=14.814219 logp_img=-1.800599 logp_noimg=-16.614819
+      token_str='doll'
+      ctx(+/-4)='chwithagreendollsittingonit.'
+
+[02] id=610 pos=52 type=object token_id=26163 delta=14.706037 |delta|=14.706037 logp_img=-1.464391 logp_noimg=-16.170427
+      token_str='apple'
+      ctx(+/-4)='asmallLegoappleandaLego'
+
+[03] id=479 pos=59 type=object token_id=503 delta=14.325523 |delta|=14.325523 logp_img=-0.021286 logp_noimg=-14.346809
+      token_str='z'
+      ctx(+/-4)=',therearetwozebraswalkingalong'
+
+[04] id=501 pos=30 type=object token_id=11544 delta=13.269431 |delta|=13.269431 logp_img=-1.582269 logp_noimg=-14.851700
+      token_str='Milit'
+      ctx(+/-4)='tobeaDetroitMilitiasticker,'
+
+[05] id=693 pos=50 type=object token_id=12247 delta=13.030708 |delta|=13.030708 logp_img=-0.961588 logp_noimg=-13.992296
+      token_str='keyboard'
+      ctx(+/-4)='issurroundedbyakeyboardandamouse,'
+
+[06] id=38 pos=15 type=other token_id=3708 delta=13.008615 |delta|=13.008615 logp_img=-1.013620 logp_noimg=-14.022236
+      token_str='pur'
+      ctx(+/-4)='field,holdingapurpleandyellows'
+
+[07] id=525 pos=6 type=object token_id=21837 delta=12.918301 |delta|=12.918301 logp_img=-0.923538 logp_noimg=-13.841839
+      token_str='steam'
+      ctx(+/-4)='imagefeaturesablacksteamtraintravelingdown'
+
+[08] id=754 pos=19 type=other token_id=7537 delta=12.328875 |delta|=12.328875 logp_img=-1.467533 logp_noimg=-13.796408
+      token_str='cit'
+      ctx(+/-4)='withavarietyofcitrusfruits.'
+
+[09] id=380 pos=7 type=object token_id=3086 delta=12.250431 |delta|=12.250431 logp_img=-0.707445 logp_noimg=-12.957876
+      token_str='National'
+      ctx(+/-4)='featuresalargewhiteNationalExpressbusparked'
+
+[10] id=501 pos=29 type=object token_id=25749 delta=12.125124 |delta|=12.125124 logp_img=-1.812477 logp_noimg=-13.937601
+      token_str='Detroit'
+      ctx(+/-4)='appearstobeaDetroitMilitiasticker'
+
+[11] id=341 pos=9 type=other token_id=19911 delta=11.900837 |delta|=11.900837 logp_img=-1.062012 logp_noimg=-12.962849
+      token_str='skill'
+      ctx(+/-4)='brownandwhitedogskillfullyridinga'
+
+[12] id=556 pos=21 type=object token_id=2439 delta=11.865824 |delta|=11.865824 logp_img=-0.906414 logp_noimg=-12.772238
+      token_str='Her'
+      ctx(+/-4)='indicatingthedirectiontoHeron.Thestreet'
+
+[13] id=417 pos=97 type=object token_id=2343 delta=11.647974 |delta|=11.647974 logp_img=-0.172741 logp_noimg=-11.820715
+      token_str='head'
+      ctx(+/-4)='.Apairofheadphonescanalso'
+
+[14] id=588 pos=14 type=object token_id=4552 delta=11.633701 |delta|=11.633701 logp_img=-0.279472 logp_noimg=-11.913174
+      token_str='ele'
+      ctx(+/-4)='walkingnearalargeelephantstatue.'
+
+[15] id=60 pos=24 type=object token_id=269 delta=11.473333 |delta|=11.473333 logp_img=-0.837666 logp_noimg=-12.310999
+      token_str='s'
+      ctx(+/-4)='tocatchayellowsoccerball.The'
+
+[16] id=836 pos=6 type=object token_id=2581 delta=11.464869 |delta|=11.464869 logp_img=-0.693377 logp_noimg=-12.158245
+      token_str='Je'
+      ctx(+/-4)='imagefeaturesablackJeepparkedon'
+
+[17] id=8 pos=16 type=object token_id=22906 delta=11.448658 |delta|=11.448658 logp_img=-0.759888 logp_noimg=-12.208546
+      token_str='pac'
+      ctx(+/-4)='field,holdingapacifierintheirmouth'
+
+[18] id=650 pos=12 type=object token_id=3974 delta=11.370359 |delta|=11.370359 logp_img=-0.102903 logp_noimg=-11.473263
+      token_str='fire'
+      ctx(+/-4)='fieldwithabluefirehydrantpromin'
+
+[19] id=774 pos=12 type=object token_id=3056 delta=11.363344 |delta|=11.363344 logp_img=-0.005957 logp_noimg=-11.369301
+      token_str='hat'
+      ctx(+/-4)='withablacktophatplacedontopof'
+
+[20] id=157 pos=22 type=object token_id=7254 delta=11.250198 |delta|=11.250198 logp_img=-1.008652 logp_noimg=-12.258850
+      token_str='blue'
+      ctx(+/-4)='.Thereareseveralblueberriesscatteredacross'
+

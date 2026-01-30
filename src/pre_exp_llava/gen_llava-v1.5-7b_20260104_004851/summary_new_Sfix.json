@@ -1,0 +1,10 @@
+{
+  "workdir": "/data/ruipeng.zhang/steering/src/pre_exp_llava/gen_llava-v1.5-7b_20260104_004851",
+  "spacy_model_used": "/data/ruipeng.zhang/anaconda3/envs/mdpo/lib/python3.12/site-packages/en_core_web_lg/en_core_web_lg-3.8.0",
+  "spacy_vectors_length": 300,
+  "similarity_score": 0.8,
+  "maxK": 200,
+  "s_definition": "Sfix: noun/span from NLTK(Treebank)+pos_tag; safe_words=truth+association; similarity by spaCy vectors; spans no longer backfilled by spaCy.",
+  "delta_file_used": "",
+  "delta_analysis": {}
+}

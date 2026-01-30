@@ -1,0 +1,14 @@
+tau = 0.2
+cases_plotted = 183
+
+[Global] token-weighted summary (lower waste_ratio is better; higher hallu_coverage is better)
+  waste_ratio      = 0.9572
+  hallu_coverage   = 0.3171
+  mean_delta_hallu = 0.1017
+  impactful_rate   = 0.2050
+
+[Soft/Oracle] token-weighted summary (if present)
+  waste_ratio      = nan
+  hallu_coverage   = 0.1726
+  mean_delta_hallu = 0.0348
+  impactful_rate   = 0.0148

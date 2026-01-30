@@ -6,6 +6,16 @@ Step 1: 从 RLHF-V 风格的数据中，构造 (Δ_word, h_{l,word}) 的“词�
 - 默认：保留 answer 区间里的所有 word（不做 topK / bottomK）；
 - 可选：对每个样本做 per-sample 的 top-K / bottom-K 截断，仅保留极端 word。
 
+【新增：token-level 详细输出】
+- 在 answer 区间内，对每个 token 输出：
+  - 有图：logp_img / p_img
+  - 无图：logp_no / p_no（含 self 概率；若 token id 一致则额外输出 match 概率）
+  - delta = logp_img(tok) - logp_no(tok)（仅在 token id match 时才有语义，否则为 None/NaN）
+  - valid / reason（是否被过滤、原因）
+- 每个样本会写一个 jsonl：
+    {out_dir}/token_details/sample_000123_tokens.jsonl
+- 同时把 token-level 数组也写进 sample_*.npz（ans_* 字段），方便你后续只读 npz 即可。
+
 数据格式（RLHF-V）示例：
 {
     "image": "llava1.5_raw_images/00013/000139279.jpg",
@@ -38,6 +48,7 @@ Step 1: 从 RLHF-V 风格的数据中，构造 (Δ_word, h_{l,word}) 的“词�
 import os
 import sys
 import json
+import math
 import argparse
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Tuple
@@ -93,7 +104,7 @@ def load_calib_dataset(question_file: str, image_root: str) -> List[CalibSample]
 
         conv = it.get("conversations", [])
         human_utts = [c["value"] for c in conv if c.get("from") == "human"]
-        gpt_utts   = [c["value"] for c in conv if c.get("from") == "gpt"]
+        gpt_utts = [c["value"] for c in conv if c.get("from") == "gpt"]
 
         if not human_utts or not gpt_utts:
             # 没有 human/gpt 的对就跳过
@@ -147,6 +158,25 @@ def is_valid_token_for_probe(token_id: int, token_str: str, tokenizer) -> bool:
         return False
 
     return True
+
+
+def token_filter_reason(token_id: int, token_str: str, tokenizer) -> Tuple[bool, str]:
+    """
+    返回 (valid, reason)：
+      - "special" / "whitespace" / "punctuation" / ""
+    """
+    special_ids = getattr(tokenizer, "all_special_ids", None)
+    if special_ids is not None and token_id in special_ids:
+        return False, "special"
+
+    if token_str.strip() == "":
+        return False, "whitespace"
+
+    stripped = token_str.strip()
+    if stripped and all(ch in string.punctuation for ch in stripped):
+        return False, "punctuation"
+
+    return True, ""
 
 
 # ====================== 辅助：把 answer 区间的 token 合并成 word span ======================
@@ -215,6 +245,8 @@ def extract_step1_delta_features(
     subset_size: Optional[int] = None,
     topk: int = 0,
     debug_token_samples: int = 0,
+    dump_token_details: bool = True,
+    token_details_dir: Optional[str] = None,
 ):
     """
     对每个样本：
@@ -247,6 +279,14 @@ def extract_step1_delta_features(
     - span_pos_list  : object 数组，每个元素是该 word 的所有 pos 列表
     - span_token_ids : object 数组，每个元素是该 word 的所有 token_id 列表
     - 每层一个数组: layer_{idx} -> [N_sel, d]，对应 h_{l,word}（mean 聚合）
+
+    另外新增 token-level 字段（长度=answer_len）：
+    - ans_tok_id_img / ans_tok_id_no
+    - ans_tok_piece / ans_tok_str
+    - ans_match / ans_valid / ans_reason
+    - ans_logp_img / ans_p_img
+    - ans_logp_no_self / ans_p_no_self
+    - ans_delta (match 才有，否则 NaN)
     """
 
     os.makedirs(out_dir, exist_ok=True)
@@ -259,6 +299,11 @@ def extract_step1_delta_features(
     total = len(samples)
     print(f"[step1] 将处理样本数: {total}")
     print(f"[step1] topk 配置: {topk} (<=0 表示保留所有 word)")
+
+    if token_details_dir is None:
+        token_details_dir = os.path.join(out_dir, "token_details")
+    if dump_token_details:
+        os.makedirs(token_details_dir, exist_ok=True)
 
     kept_samples: List[str] = []
     skipped_samples: List[Tuple[str, str]] = []  # (qid, reason)
@@ -350,6 +395,23 @@ def extract_step1_delta_features(
 
         valid_token_infos: List[Dict[str, Any]] = []
 
+        # token-level 全量记录（包含被过滤 token / mismatch token）
+        token_details_all: List[Dict[str, Any]] = []
+
+        # 也准备 token-level “定长数组”，写入 npz（长度=ans_len_img）
+        ans_tok_id_img = np.full((ans_len_img,), -1, dtype=np.int32)
+        ans_tok_id_no = np.full((ans_len_img,), -1, dtype=np.int32)
+        ans_tok_piece = np.empty((ans_len_img,), dtype=object)
+        ans_tok_str = np.empty((ans_len_img,), dtype=object)
+        ans_match = np.zeros((ans_len_img,), dtype=np.bool_)
+        ans_valid = np.zeros((ans_len_img,), dtype=np.bool_)
+        ans_reason = np.empty((ans_len_img,), dtype=object)
+        ans_lp_img = np.full((ans_len_img,), np.nan, dtype=np.float32)
+        ans_lp_no_self = np.full((ans_len_img,), np.nan, dtype=np.float32)
+        ans_p_img = np.full((ans_len_img,), np.nan, dtype=np.float32)
+        ans_p_no_self = np.full((ans_len_img,), np.nan, dtype=np.float32)
+        ans_delta = np.full((ans_len_img,), np.nan, dtype=np.float32)
+
         if debug_this_sample:
             print(f"[step1][tok-debug] ===== id={qid} answer 区间 token 过滤详情 =====")
 
@@ -360,51 +422,109 @@ def extract_step1_delta_features(
             tok_id_img = int(input_ids_img_list[pos_img])
             tok_id_no = int(input_ids_no_list[pos_no])
 
-            # 理论上 answer 文本一样，这里 token id 应该一致；
-            # 不一致的话，这个位置我们就直接跳过（不终止整个样本）。
-            if tok_id_img != tok_id_no:
-                if debug_this_sample:
-                    tok_str_img = tokenizer.decode([tok_id_img])
-                    tok_str_no = tokenizer.decode([tok_id_no])
-                    print(
-                        f"[step1][tok-debug] id={qid} k={k} pos_img={pos_img} pos_no={pos_no} "
-                        f"tok_img={tok_id_img} str_img={repr(tok_str_img)} "
-                        f"tok_no={tok_id_no} str_no={repr(tok_str_no)} -> MISMATCH, skip this pos"
-                    )
-                continue
+            ans_tok_id_img[k] = tok_id_img
+            ans_tok_id_no[k] = tok_id_no
 
-            tok_id_int = tok_id_img
-            tok_str = tokenizer.decode([tok_id_int])
-            tok_piece = tokenizer.convert_ids_to_tokens(tok_id_int)
+            # token 字符串/子词（优先用 img 那边的 id 解码；和你原逻辑一致）
+            tok_id_for_str = tok_id_img
+            tok_str = tokenizer.decode([tok_id_for_str])
+            tok_piece = tokenizer.convert_ids_to_tokens(tok_id_for_str)
 
-            valid = is_valid_token_for_probe(tok_id_int, tok_str, tokenizer)
+            ans_tok_piece[k] = tok_piece
+            ans_tok_str[k] = tok_str
+
+            # 计算两路各自对“各自 token id”的 logp/prob（即便 mismatch 也能看数）
+            lp_img_self = float(logp_img_all[pos_img, tok_id_img])
+            lp_no_self = float(logp_noimg_all[pos_no, tok_id_no])
+            p_img_self = float(torch.exp(logp_img_all[pos_img, tok_id_img]))
+            p_no_self = float(torch.exp(logp_noimg_all[pos_no, tok_id_no]))
+
+            ans_lp_img[k] = np.float32(lp_img_self)
+            ans_lp_no_self[k] = np.float32(lp_no_self)
+            ans_p_img[k] = np.float32(p_img_self)
+            ans_p_no_self[k] = np.float32(p_no_self)
+
+            match = (tok_id_img == tok_id_no)
+            ans_match[k] = match
+
+            valid, reason = token_filter_reason(tok_id_for_str, tok_str, tokenizer)
+            ans_valid[k] = valid
+            ans_reason[k] = reason
+
+            # 只有 match 时 delta 才有严格语义：logp_img(tok) - logp_no(tok)
+            delta_t = math.nan
+            lp_no_match = None
+            p_no_match = None
+            if match:
+                tok_id_int = tok_id_img
+                lp_no_match = float(logp_noimg_all[pos_no, tok_id_int])
+                p_no_match = float(torch.exp(logp_noimg_all[pos_no, tok_id_int]))
+                delta_t = lp_img_self - lp_no_match
+                ans_delta[k] = np.float32(delta_t)
+            else:
+                ans_delta[k] = np.float32(np.nan)
 
             if debug_this_sample:
                 print(
-                    f"[step1][tok-debug] id={qid} k={k} pos_img={pos_img} "
-                    f"token_id={tok_id_int} token_piece={repr(tok_piece)} "
-                    f"token_str={repr(tok_str)} valid={valid}"
+                    f"[step1][tok-debug] id={qid} k={k} pos_img={pos_img} pos_no={pos_no} "
+                    f"tok_img={tok_id_img} tok_no={tok_id_no} match={match} "
+                    f"piece={repr(tok_piece)} str={repr(tok_str)} "
+                    f"valid={valid} reason={reason} "
+                    f"logp_img={lp_img_self:.6f} p_img={p_img_self:.6g} "
+                    f"logp_no(self)={lp_no_self:.6f} p_no(self)={p_no_self:.6g} "
+                    f"logp_no(match)={(lp_no_match if match else float('nan')):.6f} "
+                    f"delta={(delta_t if match else float('nan')):.6f}"
                 )
 
-            if not valid:
-                # 无语义 / 纯标点 / special，这个位置不参与 word-level 统计，
-                # 但它会通过 k 的不连续性把 word span 切开。
+            # --- 落盘 token-level 详细信息（全量） ---
+            token_details_all.append(
+                {
+                    "id": qid,
+                    "k": int(k),
+                    "pos_img": int(pos_img),
+                    "pos_no": int(pos_no),
+                    "tok_id_img": int(tok_id_img),
+                    "tok_id_no": int(tok_id_no),
+                    "match": bool(match),
+                    "token_piece": tok_piece,
+                    "token_str": tok_str,
+                    "valid": bool(valid),
+                    "reason": reason,
+                    "logp_img_self": lp_img_self,
+                    "p_img_self": p_img_self,
+                    "logp_no_self": lp_no_self,
+                    "p_no_self": p_no_self,
+                    "logp_no_match": (lp_no_match if match else None),
+                    "p_no_match": (p_no_match if match else None),
+                    "delta": (delta_t if match else None),
+                }
+            )
+
+            # mismatch 或 invalid：不进入 word-level 聚合，但 token-level 已经记录
+            if (not match) or (not valid):
                 continue
 
-            lp_img = float(logp_img_all[pos_img, tok_id_int])
-            lp_no = float(logp_noimg_all[pos_no, tok_id_int])
-            delta_t = lp_img - lp_no
-
+            # 用 match 的 token 做 Δ_t
             valid_token_infos.append(
                 {
                     "k": k,                          # answer 内相对位置
                     "pos": pos_img,                  # 全局位置（有图序列）
-                    "token_id": tok_id_int,
+                    "token_id": tok_id_img,
                     "token_str": tok_str,
                     "token_piece": tok_piece,
-                    "delta": delta_t,
+                    "delta": float(delta_t),
                 }
             )
+
+        # ===== 3.5 可选：把 token-level 详情写 jsonl（每样本一个文件）=====
+        if dump_token_details:
+            tok_out_path = os.path.join(token_details_dir, f"sample_{idx:06d}_tokens.jsonl")
+            try:
+                with open(tok_out_path, "w", encoding="utf-8") as f:
+                    for row in token_details_all:
+                        f.write(json.dumps(row, ensure_ascii=False) + "\n")
+            except Exception as e:
+                print(f"[step1][warn] id={qid} 写 token_details 失败: {e} (path={tok_out_path})")
 
         if len(valid_token_infos) == 0:
             reason = "no_valid_token_in_answer_span"
@@ -424,7 +544,6 @@ def extract_step1_delta_features(
         # 每个 word_span -> 一个 word_record
         word_records: List[Dict[str, Any]] = []
         for span in word_spans:
-            # span: List[info]，每个 info 是前面 append 的 dict
             deltas = [info["delta"] for info in span]
             delta_word = max(deltas)
 
@@ -469,10 +588,7 @@ def extract_step1_delta_features(
                 continue
             selected = word_records[:k] + word_records[-k:]
         else:
-            # 不做截断，保留所有 word
             selected = word_records
-
-        N_sel = len(selected)
 
         # ===== 6. 把 word 级别的信息打包成 numpy 数组 =====
         token_ids_sel = np.array([r["token_id"] for r in selected], dtype=np.int32)
@@ -506,7 +622,6 @@ def extract_step1_delta_features(
             word_feats: List[np.ndarray] = []
             for r in selected:
                 span_pos = r["span_pos"]
-                # [len(span_pos), d] -> [d]
                 h_span = arr_t_d[span_pos, :]
                 h_mean = h_span.mean(axis=0)
                 word_feats.append(h_mean)
@@ -529,6 +644,22 @@ def extract_step1_delta_features(
             image_rel=np.array(image_rel),
             question=np.array(sample.query),
             answer=np.array(sample.answer),
+
+            # ===== token-level（answer 区间逐 token）=====
+            ans_tok_id_img=ans_tok_id_img,
+            ans_tok_id_no=ans_tok_id_no,
+            ans_tok_piece=ans_tok_piece,
+            ans_tok_str=ans_tok_str,
+            ans_match=ans_match,
+            ans_valid=ans_valid,
+            ans_reason=ans_reason,
+            ans_logp_img=ans_lp_img,
+            ans_logp_no_self=ans_lp_no_self,
+            ans_p_img=ans_p_img,
+            ans_p_no_self=ans_p_no_self,
+            ans_delta=ans_delta,
+
+            # ===== word-level（原逻辑）=====
             token_ids=token_ids_sel,           # word 级代表 token_id
             token_pos=token_pos_sel,           # word 起始位置（首 subword）
             token_strs=token_strs_sel,         # 完整 word 字符串
@@ -629,7 +760,7 @@ def parse_args():
     parser.add_argument(
         "--subset-size",
         type=int,
-        default=500,
+        default=5,
         help="只跑前 N 个样本（0 表示全量）",
     )
     parser.add_argument(
@@ -641,8 +772,22 @@ def parse_args():
     parser.add_argument(
         "--debug-token-samples",
         type=int,
-        default=1,
+        default=5,
         help="前 N 条样本输出 answer 区间的 token 过滤详情（0 表示不输出）。",
+    )
+
+    # --- 新增：token-level 落盘 ---
+    parser.add_argument(
+        "--dump-token-details",
+        type=int,
+        default=1,
+        help="是否把 answer 区间每个 token 的 logp/prob/delta 细节写 jsonl（1/0）。默认 1。",
+    )
+    parser.add_argument(
+        "--token-details-dir",
+        type=str,
+        default=None,
+        help="token 级详情输出目录（默认 out_dir/token_details）。",
     )
 
     return parser.parse_args()
@@ -680,6 +825,8 @@ def main():
         subset_size=subset,
         topk=args.topk,
         debug_token_samples=args.debug_token_samples,
+        dump_token_details=bool(args.dump_token_details),
+        token_details_dir=args.token_details_dir,
     )
 
 

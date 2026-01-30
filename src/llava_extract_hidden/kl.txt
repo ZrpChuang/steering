@@ -1,0 +1,65 @@
+========================================================================================================================
+[run] compute KL stats (aligned) -> single txt
+[run] model_path=/data/base_model/base_models_mllms/llava-v1.5-7b
+[run] question_file=/data/ruipeng.zhang/dpo_on/new_folder/RLHF-V-Dataset.json
+[run] image_folder=/data/ruipeng.zhang/dpo_on/recreated_images
+[run] subset_size=100
+[run] dtype=float16 device=cuda seed=42
+[run] kl_mode=img||no chunk_tokens=0
+[run] IMAGE_TOKEN_INDEX=-200
+========================================================================================================================
+[load] filtered samples = 100
+[info] si=0 id=0 ans_len=18 used=18 diff=575 n_img=1 extra_per_img=575
+[info] si=20 id=20 ans_len=17 used=17 diff=575 n_img=1 extra_per_img=575
+[info] si=40 id=40 ans_len=214 used=214 diff=575 n_img=1 extra_per_img=575
+[info] si=60 id=60 ans_len=119 used=119 diff=575 n_img=1 extra_per_img=575
+[info] si=80 id=80 ans_len=11 used=11 diff=575 n_img=1 extra_per_img=575
+
+========================================================================================================================
+[summary] finished.
+[summary] samples_ok   = 100
+[summary] samples_skip = 0
+[summary] posmap_failed = 0
+[summary] tokens_total(answer) = 8186
+[summary] tokens_used (aligned&matched) = 8186
+[summary] token_used_ratio = 1.000000
+[summary] tokens_mismatch(img!=no) = 0
+[summary] tokens_badrow(row invalid) = 0
+------------------------------------------------------------------------------------------------------------------------
+[KL(img||no)] n=8186
+[KL(img||no)] mean=0.312944  std=0.670364  min=0.000000  max=8.358541
+[KL(img||no)] p50=0.091370  p90=0.751416  p95=1.433840  p99=3.523690
+[KL(img||no)] percentiles: p00=0.000000  p01=0.000010  p05=0.000164  p10=0.001212  p25=0.019190  p50=0.091370  p75=0.287516  p90=0.751416  p95=1.433840  p99=3.523690  p100=8.358541
+------------------------------------------------------------------------------------------------------------------------
+[top] global top-30 KL tokens (pooled):
+  #00  KL=8.358541  id=88  piece='LA'  str='LA'
+  #01  KL=7.588654  id=11  piece='▁women'  str='women'
+  #02  KL=7.529441  id=66  piece='▁J'  str='J'
+  #03  KL=7.314118  id=66  piece='▁Nom'  str='Nom'
+  #04  KL=7.158991  id=91  piece='▁the'  str='the'
+  #05  KL=7.133958  id=25  piece='▁Nothing'  str='Nothing'
+  #06  KL=6.937617  id=86  piece='▁table'  str='table'
+  #07  KL=6.635698  id=13  piece='▁ele'  str='ele'
+  #08  KL=6.576603  id=35  piece='▁living'  str='living'
+  #09  KL=6.572281  id=5  piece='▁baseball'  str='baseball'
+  #10  KL=6.496482  id=32  piece='▁baseball'  str='baseball'
+  #11  KL=6.455261  id=37  piece='▁co'  str='co'
+  #12  KL=6.082355  id=67  piece='board'  str='board'
+  #13  KL=6.040792  id=72  piece='▁mask'  str='mask'
+  #14  KL=6.012793  id=82  piece='a'  str='a'
+  #15  KL=5.913878  id=11  piece='▁ban'  str='ban'
+  #16  KL=5.801339  id=91  piece='▁on'  str='on'
+  #17  KL=5.758080  id=95  piece='▁ro'  str='ro'
+  #18  KL=5.712887  id=83  piece='▁land'  str='land'
+  #19  KL=5.640848  id=11  piece='▁sc'  str='sc'
+  #20  KL=5.607813  id=69  piece='▁sh'  str='sh'
+  #21  KL=5.462284  id=9  piece='▁p'  str='p'
+  #22  KL=5.317870  id=43  piece='▁church'  str='church'
+  #23  KL=5.258901  id=59  piece='▁snow'  str='snow'
+  #24  KL=5.207063  id=82  piece='▁sp'  str='sp'
+  #25  KL=5.184315  id=85  piece='▁bare'  str='bare'
+  #26  KL=5.159376  id=68  piece='▁bath'  str='bath'
+  #27  KL=5.114867  id=35  piece='▁well'  str='well'
+  #28  KL=4.978265  id=66  piece='Ref'  str='Ref'
+  #29  KL=4.866502  id=24  piece='▁Toronto'  str='Toronto'
+========================================================================================================================

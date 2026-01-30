@@ -1,0 +1,16 @@
+{
+  "n_total_valid": 183,
+  "target_n": 180,
+  "dropped_ids": [
+    120,
+    896,
+    943
+  ],
+  "drop_policy": {
+    "priority": [
+      "global.bad_hallu (most negative x first)",
+      "global.bad_both (most negative x first)"
+    ]
+  },
+  "n_final": 180
+}
